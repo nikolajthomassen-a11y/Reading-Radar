@@ -112,11 +112,22 @@
   .profilebox{background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:12px;padding:14px 16px;margin-top:16px;font-size:.94rem;color:var(--accent-ink)}
   .profilebox .lbl{display:block;font-family:var(--sans);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
 
-  /* ── Filters ── */
-  .filterbar{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
-  .fchip{font-family:var(--sans);font-size:.74rem;font-weight:500;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:6px 13px;cursor:pointer}
-  .fchip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-  .fchip.genre.on{background:var(--accent);border-color:var(--accent)}
+  /* ── Editorial picks page (the "book radar" view) ── */
+  .headrule{border:none;border-top:1px solid var(--line-dark);margin:22px 0 0}
+  .tasteprof{display:grid;grid-template-columns:1fr;gap:10px;padding:20px 0 22px;border-bottom:1px solid var(--line-dark)}
+  .tasteprof h2{font-family:var(--sans);font-size:.7rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-top:4px}
+  .tasteprof p{font-size:1.02rem;color:var(--body)}
+  .pillhint{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:14px}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .pill{font-family:var(--sans);font-size:.72rem;font-weight:500;color:var(--body);border:1px solid var(--line-dark);background:var(--card);border-radius:999px;padding:5px 13px;cursor:pointer}
+  .pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--paper) 82%,rgba(250,248,244,0));padding:16px 0 14px}
+  .fbtn{font-family:var(--sans);font-size:.78rem;font-weight:500;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:8px 15px;cursor:pointer}
+  .fbtn.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .count{font-family:var(--sans);font-size:.76rem;color:var(--muted);align-self:center;margin-left:auto}
+  .card .meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;font-family:var(--sans);font-size:.76rem;color:var(--muted)}
+  .card .meta a{color:var(--accent);font-weight:500;text-decoration:none}
+  .card .meta a:hover{text-decoration:underline}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
   .cat{font-family:var(--sans);font-size:.64rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;margin-bottom:10px}
@@ -172,6 +183,7 @@
     .hero-inner,.screen{max-width:1000px}
     .vfwrap,.shutterrow{display:none}
     .deskscan{display:block}
+    .tasteprof{grid-template-columns:160px 1fr;gap:24px;padding:28px 0 30px}
     #pickcards{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-top:14px}
     #pickcards .card{margin-top:0}
     #liblist{column-count:2;column-gap:32px}
@@ -248,17 +260,28 @@
 <!-- PICKS TAB -->
 <div class="tab" id="tab-picks">
   <div class="screen pad-top">
-    <div class="kicker">Reading Radar</div>
-    <h1 class="dark">What to read <em>next</em></h1>
-    <p class="standfirst dark">Recommendations built from your own shelves.</p>
+    <header>
+      <div class="kicker">Reading Radar</div>
+      <h1 class="dark">What to read <em>next</em></h1>
+      <p class="standfirst dark">Recommendations drawn from your own shelves — new releases, backlist gems, award winners and the occasional wildcard.</p>
+      <hr class="headrule">
+    </header>
+
+    <section class="tasteprof" id="tasteprof" style="display:none">
+      <h2>Your taste<br>profile</h2>
+      <div>
+        <p id="proftext"></p>
+        <div class="pillhint">Tap a genre to filter your picks — combine as many as you like:</div>
+        <div class="pills" id="genrepills"></div>
+      </div>
+    </section>
 
     <div class="btnrow">
-      <button class="btn primary" id="genbtn">✨ Get my recommendations</button>
+      <button class="btn primary" id="genbtn">✨ Reveal my next picks</button>
     </div>
     <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 
-    <div id="profilewrap"></div>
-    <div class="filterbar" id="filterbar"></div>
+    <div class="toolbar" id="cattoolbar" style="display:none"></div>
     <div id="pickcards"></div>
     <div id="purchwrap"></div>
   </div>
@@ -527,43 +550,62 @@ $('genbtn').addEventListener('click', async ()=>{
   $('genbtn').disabled=false; $('recspin').classList.remove('on');
 });
 
-/* ---------- filters ---------- */
+/* ---------- filters & editorial picks view ---------- */
 const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
 const GNAME={crime:"Crime / noir",spy:"Espionage",lit:"Literary",hist:"Historical",west:"Westerns",foot:"Football",series:"Series"};
 let filt = {cat:'all', genres:new Set()};
 function gname(g){ return GNAME[g] || (g.charAt(0).toUpperCase()+g.slice(1)); }
-function renderFilters(){
-  const cats = [...new Set(state.picks.map(p=>p.category).filter(c=>CATNAME[c]))];
-  const genres = [...new Set(state.picks.flatMap(p=>p.genres||[]))];
-  if(!state.picks.length){ $('filterbar').innerHTML=''; return; }
-  let html = `<button class="fchip ${filt.cat==='all'?'on':''}" data-cat="all">All</button>`;
-  html += cats.map(c=>`<button class="fchip ${filt.cat===c?'on':''}" data-cat="${c}">${CATNAME[c]}</button>`).join('');
-  html += genres.map(g=>`<button class="fchip genre ${filt.genres.has(g)?'on':''}" data-g="${esc(g)}">${gname(g)}</button>`).join('');
-  $('filterbar').innerHTML = html;
+function gr(p){ return "https://www.goodreads.com/search?q="+encodeURIComponent(p.title+" "+p.author); }
+function filteredPicks(){
+  return state.picks.filter(p=>
+    (filt.cat==='all'||p.category===filt.cat) &&
+    (!filt.genres.size || (p.genres||[]).some(g=>filt.genres.has(g)))
+  );
 }
-$('filterbar').addEventListener('click',e=>{
-  const b=e.target.closest('.fchip'); if(!b) return;
-  if(b.dataset.cat){ filt.cat=b.dataset.cat; }
-  else if(b.dataset.g){ filt.genres.has(b.dataset.g)?filt.genres.delete(b.dataset.g):filt.genres.add(b.dataset.g); }
+function renderFilters(){
+  if(!state.picks.length){
+    $('tasteprof').style.display='none';
+    $('cattoolbar').style.display='none';
+    return;
+  }
+  $('tasteprof').style.display='grid';
+  $('proftext').textContent = state.profile||'';
+  const genres = [...new Set(state.picks.flatMap(p=>p.genres||[]))];
+  $('genrepills').innerHTML = genres.map(g=>
+    `<button class="pill ${filt.genres.has(g)?'on':''}" data-g="${esc(g)}">${gname(g)}</button>`).join('');
+  const cats = [...new Set(state.picks.map(p=>p.category).filter(c=>CATNAME[c]))];
+  $('cattoolbar').style.display='flex';
+  $('cattoolbar').innerHTML =
+    `<button class="fbtn ${filt.cat==='all'?'on':''}" data-cat="all">All</button>`+
+    cats.map(c=>`<button class="fbtn ${filt.cat===c?'on':''}" data-cat="${c}">${CATNAME[c]}</button>`).join('')+
+    `<span class="count">${filteredPicks().length} of ${state.picks.length} picks</span>`;
+}
+$('cattoolbar').addEventListener('click',e=>{
+  const b=e.target.closest('.fbtn'); if(!b) return;
+  filt.cat=b.dataset.cat; renderPicks();
+});
+$('genrepills').addEventListener('click',e=>{
+  const b=e.target.closest('.pill'); if(!b) return;
+  const g=b.dataset.g;
+  filt.genres.has(g)?filt.genres.delete(g):filt.genres.add(g);
   renderPicks();
 });
 
 function renderPicks(){
-  $('profilewrap').innerHTML = state.profile ?
-    `<div class="profilebox"><span class="lbl">Your taste profile</span>${esc(state.profile)}</div>` : '';
   renderFilters();
-  const shown = state.picks.filter(p=>
-    (filt.cat==='all'||p.category===filt.cat) &&
-    (!filt.genres.size || (p.genres||[]).some(g=>filt.genres.has(g)))
-  );
+  const shown = filteredPicks();
   $('pickcards').innerHTML = shown.map(p=>`
     <div class="card" data-id="${p.id}">
       <span class="cat ${esc(p.category||'backlist')}">${CATNAME[p.category]||'Pick'}</span>
       <h3>${esc(p.title)}</h3>
-      <div class="author">${esc(p.author)} · ${esc(p.year||'')}</div>
+      <div class="author">${esc(p.author)}</div>
       <p class="desc">${esc(p.desc)}</p>
       <div class="why"><span class="lbl">Why it's for you</span>${esc(p.why)}</div>
-      ${(p.genres&&p.genres.length)?`<div class="gtags">${p.genres.map(gname).map(esc).join(' · ')}</div>`:''}
+      <div class="meta">
+        <span>${esc(p.year||'')}</span>
+        <a href="${gr(p)}" target="_blank" rel="noopener">Goodreads ↗</a>
+        ${(p.genres&&p.genres.length)?`<span>${p.genres.map(gname).map(esc).join(' · ')}</span>`:''}
+      </div>
       <div class="actions">
         <button class="act morelike">✚ More like this</button>
         <button class="act markread">✓ Already read</button>
