@@ -11,7 +11,7 @@
 <title>Reading Radar</title>
 <style>
   :root{
-    --g1:#0e3d2e; --g2:#43b58c;            /* the gradient pair: deep evergreen → fresh mint */
+    --g1:#0e3d2e; --g2:#43b58c;            /* gradient pair: deep evergreen → fresh mint */
     --paper:#faf8f4; --card:#ffffff; --ink:#171512; --body:#3d3833; --muted:#8a8378;
     --accent:#1f5c43; --accent-ink:#17462f; --mint:#bfeeda;
     --line:#eae5dc; --line-dark:#d9d2c6;
@@ -71,6 +71,9 @@
   .shutter:disabled{opacity:.45}
   .altpick{position:absolute;right:6px;font-family:var(--sans);font-size:.76rem;font-weight:500;color:rgba(255,255,255,.85);background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 13px;cursor:pointer}
 
+  /* Desktop note shown instead of the camera */
+  .deskscan{display:none;margin-top:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:16px 18px;font-family:var(--sans);font-size:.88rem;color:#fff}
+
   /* ── Body content ── */
   .screen{max-width:640px;margin:0 auto;padding:0 18px calc(96px + env(safe-area-inset-bottom))}
   .pad-top{padding-top:calc(22px + env(safe-area-inset-top))}
@@ -101,8 +104,19 @@
   .manrow input{flex:1;font-family:var(--sans);font-size:16px;border:1px solid var(--line-dark);border-radius:10px;padding:10px 12px;background:var(--card);min-width:0}
   .manrow button{font-family:var(--sans);font-weight:600;font-size:.85rem;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer}
 
+  .syncrow{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+  .syncrow .linkbox{display:flex;gap:8px;margin-top:8px}
+  .syncrow input{flex:1;font-family:var(--sans);font-size:.78rem;border:1px solid var(--line-dark);border-radius:8px;padding:8px 10px;color:var(--muted);background:var(--paper);min-width:0}
+  .syncrow button{font-family:var(--sans);font-weight:600;font-size:.78rem;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer}
+
   .profilebox{background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:12px;padding:14px 16px;margin-top:16px;font-size:.94rem;color:var(--accent-ink)}
   .profilebox .lbl{display:block;font-family:var(--sans);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+
+  /* ── Filters ── */
+  .filterbar{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+  .fchip{font-family:var(--sans);font-size:.74rem;font-weight:500;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:6px 13px;cursor:pointer}
+  .fchip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .fchip.genre.on{background:var(--accent);border-color:var(--accent)}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
   .cat{font-family:var(--sans);font-size:.64rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;margin-bottom:10px}
@@ -116,6 +130,7 @@
   .card .desc{margin-top:8px;font-size:.94rem;color:var(--body)}
   .card .why{margin-top:10px;font-size:.9rem;color:var(--accent-ink);background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:10px;padding:10px 13px}
   .card .why .lbl{display:block;font-family:var(--sans);font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+  .card .gtags{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:10px}
   .actions{display:flex;gap:8px;margin-top:12px}
   .act{flex:1;font-family:var(--sans);font-size:.76rem;font-weight:600;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:9px 4px;cursor:pointer}
   .act:active{background:var(--paper)}
@@ -149,6 +164,17 @@
   .tab{display:none}
   .tab.on{display:block}
   input[type=file]{display:none}
+
+  /* ── Desktop overview layout ── */
+  @media(min-width:900px){
+    .hero-inner,.screen{max-width:1000px}
+    .vfwrap,.shutterrow{display:none}
+    .deskscan{display:block}
+    #pickcards{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-top:14px}
+    #pickcards .card{margin-top:0}
+    #liblist{column-count:2;column-gap:32px}
+    .libitem{break-inside:avoid}
+  }
 </style>
 </head>
 <body>
@@ -178,6 +204,8 @@
         <label class="altpick" for="filein">Photo</label>
       </div>
       <input type="file" id="filein" accept="image/*">
+
+      <div class="deskscan">📱 Scanning happens on your phone — this is the big-screen view of the same library. Changes sync automatically both ways.</div>
     </div>
   </div>
 
@@ -204,6 +232,13 @@
         <input id="mana" placeholder="Author">
         <button id="manadd">Add</button>
       </div>
+      <div class="syncrow">
+        Open your library on another device — same books, same picks, bigger screen:
+        <div class="linkbox">
+          <input id="synclink" readonly>
+          <button id="copylink">Copy</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -221,6 +256,7 @@
     <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 
     <div id="profilewrap"></div>
+    <div class="filterbar" id="filterbar"></div>
     <div id="pickcards"></div>
     <div id="purchwrap"></div>
   </div>
@@ -234,11 +270,49 @@
 </nav>
 
 <script>
-/* ---------- state ---------- */
-let state = {code:'', library:[], picks:[], purchased:[], history:[], profile:''};
-function save(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
-function load(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
-load();
+/* ---------- state & sync ---------- */
+let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], profile:''};
+function saveLocal(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
+function loadLocal(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
+loadLocal();
+
+function randId(){ const c='abcdefghjkmnpqrstuvwxyz23456789'; let s=''; for(let i=0;i<10;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+/* adopt a sync id from a shared link: site/#s=xxxx */
+(function(){
+  const m = location.hash.match(/s=([A-Za-z0-9_-]+)/);
+  if(m){ state.syncId = m[1]; state.rev = 0; history.replaceState(null,'',location.pathname); }
+  if(!state.syncId) state.syncId = randId();
+  saveLocal();
+})();
+
+let pushTimer=null;
+function save(){                      /* save locally + push to the cloud (debounced) */
+  state.rev = Date.now(); saveLocal();
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async ()=>{
+    try{
+      const payload = Object.assign({}, state); delete payload.code;
+      await fetch('/api/state?id='+state.syncId, {
+        method:'POST', headers:{'content-type':'application/json','x-app-code':state.code||''},
+        body: JSON.stringify(payload)
+      });
+    }catch(e){}
+  }, 1200);
+}
+async function pull(){
+  try{
+    const r = await fetch('/api/state?id='+state.syncId, {headers:{'x-app-code':state.code||''}});
+    if(r.status===401){ $('codebanner').classList.add('on'); return; }
+    if(!r.ok) return;
+    const remote = await r.json();
+    if(remote && remote.rev && remote.rev > (state.rev||0)){
+      const code = state.code;
+      state = Object.assign(state, remote);
+      state.code = code; saveLocal();
+      renderLibrary(); renderPicks();
+    }
+  }catch(e){}
+}
 
 let pendingScan = [];
 const $ = id => document.getElementById(id);
@@ -256,7 +330,16 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
 }));
 
 /* ---------- access code ---------- */
-$('codeinput').addEventListener('change',e=>{ state.code=e.target.value.trim(); save(); $('codebanner').classList.remove('on'); toast('Code saved — try again'); });
+$('codeinput').addEventListener('change',e=>{ state.code=e.target.value.trim(); saveLocal(); $('codebanner').classList.remove('on'); toast('Code saved — try again'); pull(); });
+
+/* ---------- sync link ---------- */
+function renderSyncLink(){
+  $('synclink').value = location.origin + '/#s=' + state.syncId;
+}
+$('copylink').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText($('synclink').value); toast('Link copied — open it on your computer'); }
+  catch(e){ $('synclink').select(); toast('Long-press the link to copy it'); }
+});
 
 /* ---------- API ---------- */
 async function callApi(path, body){
@@ -297,8 +380,9 @@ function extractJson(text){
 
 /* ---------- live viewfinder ---------- */
 let stream = null;
+const isDesktop = ()=> window.matchMedia('(min-width:900px)').matches;
 async function startCamera(){
-  if(stream) return;
+  if(stream || isDesktop()) return;
   try{
     stream = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1440} },
@@ -318,7 +402,7 @@ function stopCamera(){
 }
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden) stopCamera();
-  else if($('tab-shelf').classList.contains('on')) startCamera();
+  else if($('tab-shelf').classList.contains('on')){ startCamera(); pull(); }
 });
 
 function frameToBase64(){
@@ -338,7 +422,6 @@ async function scanImage(b64){
     const text = await callApi('/api/scan', {image:b64});
     const data = extractJson(text);
     const found = (data.books||[]).filter(b=>b.title);
-    // merge into pending (multi-shelf flow: keep scanning, list grows)
     found.forEach(b=>{
       if(!pendingScan.some(x=>x.title.toLowerCase()===b.title.toLowerCase())) pendingScan.push(b);
     });
@@ -413,6 +496,7 @@ function renderLibrary(){
   document.querySelectorAll('#liblist .rm').forEach(btn=>btn.addEventListener('click',()=>{
     state.library.splice(+btn.dataset.i,1); save(); renderLibrary();
   }));
+  renderSyncLink();
 }
 $('manadd').addEventListener('click',()=>{
   const t=$('mant').value.trim(), a=$('mana').value.trim();
@@ -441,17 +525,43 @@ $('genbtn').addEventListener('click', async ()=>{
   $('genbtn').disabled=false; $('recspin').classList.remove('on');
 });
 
+/* ---------- filters ---------- */
 const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
+const GNAME={crime:"Crime / noir",spy:"Espionage",lit:"Literary",hist:"Historical",west:"Westerns",foot:"Football",series:"Series"};
+let filt = {cat:'all', genres:new Set()};
+function gname(g){ return GNAME[g] || (g.charAt(0).toUpperCase()+g.slice(1)); }
+function renderFilters(){
+  const cats = [...new Set(state.picks.map(p=>p.category).filter(c=>CATNAME[c]))];
+  const genres = [...new Set(state.picks.flatMap(p=>p.genres||[]))];
+  if(!state.picks.length){ $('filterbar').innerHTML=''; return; }
+  let html = `<button class="fchip ${filt.cat==='all'?'on':''}" data-cat="all">All</button>`;
+  html += cats.map(c=>`<button class="fchip ${filt.cat===c?'on':''}" data-cat="${c}">${CATNAME[c]}</button>`).join('');
+  html += genres.map(g=>`<button class="fchip genre ${filt.genres.has(g)?'on':''}" data-g="${esc(g)}">${gname(g)}</button>`).join('');
+  $('filterbar').innerHTML = html;
+}
+$('filterbar').addEventListener('click',e=>{
+  const b=e.target.closest('.fchip'); if(!b) return;
+  if(b.dataset.cat){ filt.cat=b.dataset.cat; }
+  else if(b.dataset.g){ filt.genres.has(b.dataset.g)?filt.genres.delete(b.dataset.g):filt.genres.add(b.dataset.g); }
+  renderPicks();
+});
+
 function renderPicks(){
   $('profilewrap').innerHTML = state.profile ?
     `<div class="profilebox"><span class="lbl">Your taste profile</span>${esc(state.profile)}</div>` : '';
-  $('pickcards').innerHTML = state.picks.map(p=>`
+  renderFilters();
+  const shown = state.picks.filter(p=>
+    (filt.cat==='all'||p.category===filt.cat) &&
+    (!filt.genres.size || (p.genres||[]).some(g=>filt.genres.has(g)))
+  );
+  $('pickcards').innerHTML = shown.map(p=>`
     <div class="card" data-id="${p.id}">
       <span class="cat ${esc(p.category||'backlist')}">${CATNAME[p.category]||'Pick'}</span>
       <h3>${esc(p.title)}</h3>
       <div class="author">${esc(p.author)} · ${esc(p.year||'')}</div>
       <p class="desc">${esc(p.desc)}</p>
       <div class="why"><span class="lbl">Why it's for you</span>${esc(p.why)}</div>
+      ${(p.genres&&p.genres.length)?`<div class="gtags">${p.genres.map(gname).map(esc).join(' · ')}</div>`:''}
       <div class="actions">
         <button class="act morelike">✚ More like this</button>
         <button class="act markread">✓ Already read</button>
@@ -509,7 +619,7 @@ function bindCardActions(){
 }
 
 /* ---------- init ---------- */
-renderLibrary(); renderPicks(); startCamera();
+renderLibrary(); renderPicks(); startCamera(); pull();
 </script>
 </body>
 </html>
