@@ -1,0 +1,9 @@
+{
+  "name": "Reading Radar",
+  "short_name": "Radar",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#faf8f4",
+  "theme_color": "#1f5c43",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}

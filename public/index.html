@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#faf8f4">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Reading Radar</title>
+<style>
+  :root{
+    --paper:#faf8f4; --card:#ffffff; --ink:#171512; --body:#3d3833; --muted:#8a8378;
+    --accent:#1f5c43; --accent-ink:#17462f;
+    --line:#eae5dc; --line-dark:#d9d2c6;
+    --new:#1f5c43; --new-bg:#e7f0ea;
+    --back:#a3502e; --back-bg:#f7ebe3;
+    --wild:#6b4fa1; --wild-bg:#efeaf7;
+    --awd:#b08514; --awd-bg:#f8f0da;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,Charter,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--serif);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .screen{max-width:640px;margin:0 auto;padding:22px 18px calc(96px + env(safe-area-inset-bottom))}
+
+  .kicker{font-family:var(--sans);font-size:.68rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:1.9rem;font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-top:6px}
+  h1 em{font-style:italic;color:var(--accent-ink)}
+  .standfirst{font-family:var(--sans);font-size:.84rem;color:var(--muted);margin-top:8px}
+
+  .btn{font-family:var(--sans);font-size:.9rem;font-weight:600;border:none;border-radius:12px;padding:14px 18px;cursor:pointer;width:100%;text-align:center;display:block}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:active{background:var(--accent-ink)}
+  .btn.secondary{background:var(--card);color:var(--ink);border:1px solid var(--line-dark)}
+  .btn:disabled{opacity:.5}
+  .btnrow{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
+  .panel h2{font-family:var(--sans);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+  .hero{text-align:center;padding:34px 16px;border:1.5px dashed var(--line-dark);border-radius:16px;margin-top:20px;background:var(--card)}
+  .hero .big{font-size:2.2rem}
+  .hero p{font-size:.98rem;color:var(--body);margin-top:8px}
+  .hero .hint{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:6px}
+
+  .libitem{display:flex;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .libitem:last-child{border-bottom:none}
+  .libitem .a{color:var(--muted);font-size:.82rem;font-family:var(--sans)}
+  .libitem .rm{margin-left:auto;font-family:var(--sans);font-size:.9rem;color:var(--muted);background:none;border:none;padding:4px 8px;cursor:pointer}
+  .scanrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .scanrow:last-child{border-bottom:none}
+  .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent)}
+  .scanrow .lowc{font-family:var(--sans);font-size:.68rem;color:var(--back);background:var(--back-bg);border-radius:999px;padding:2px 8px}
+  .manrow{display:flex;gap:8px;margin-top:10px}
+  .manrow input{flex:1;font-family:var(--sans);font-size:16px;border:1px solid var(--line-dark);border-radius:10px;padding:10px 12px;background:var(--card);min-width:0}
+  .manrow button{font-family:var(--sans);font-weight:600;font-size:.85rem;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer}
+
+  .profilebox{background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:12px;padding:14px 16px;margin-top:16px;font-size:.94rem;color:var(--accent-ink)}
+  .profilebox .lbl{display:block;font-family:var(--sans);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
+  .cat{font-family:var(--sans);font-size:.64rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;margin-bottom:10px}
+  .cat::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .cat.new{color:var(--new);background:var(--new-bg)}
+  .cat.backlist{color:var(--back);background:var(--back-bg)}
+  .cat.wildcard{color:var(--wild);background:var(--wild-bg)}
+  .cat.award{color:var(--awd);background:var(--awd-bg)}
+  .card h3{font-size:1.18rem;font-weight:400;font-style:italic}
+  .card .author{font-family:var(--sans);font-size:.8rem;color:var(--muted);margin-top:2px}
+  .card .desc{margin-top:8px;font-size:.94rem;color:var(--body)}
+  .card .why{margin-top:10px;font-size:.9rem;color:var(--accent-ink);background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:10px;padding:10px 13px}
+  .card .why .lbl{display:block;font-family:var(--sans);font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+  .actions{display:flex;gap:8px;margin-top:12px}
+  .act{flex:1;font-family:var(--sans);font-size:.76rem;font-weight:600;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:9px 4px;cursor:pointer}
+  .act:active{background:var(--paper)}
+  .similar{margin-top:10px;border-left:2px solid var(--line-dark);padding-left:12px}
+  .simcard{padding:10px 0;border-bottom:1px solid var(--line)}
+  .simcard:last-child{border-bottom:none}
+  .simcard .t{font-style:italic;font-size:1rem}
+  .simcard .a{font-family:var(--sans);font-size:.76rem;color:var(--muted)}
+  .simcard .d{font-size:.86rem;color:var(--body);margin-top:3px}
+
+  .purchhead{font-family:var(--sans);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:26px 0 4px}
+  .purchitem{display:flex;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .purchitem .badge{margin-left:auto;font-family:var(--sans);font-size:.66rem;font-weight:600;color:var(--awd);background:var(--awd-bg);border-radius:999px;padding:3px 9px}
+
+  .spin{display:none;text-align:center;padding:26px 16px;font-family:var(--sans);font-size:.86rem;color:var(--muted)}
+  .spin.on{display:block}
+  .spin .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin:0 3px;animation:b 1.2s infinite}
+  .spin .dot:nth-child(2){animation-delay:.2s}.spin .dot:nth-child(3){animation-delay:.4s}
+  @keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+  .banner{display:none;background:var(--back-bg);color:var(--back);font-family:var(--sans);font-size:.84rem;border-radius:12px;padding:12px 14px;margin-top:14px}
+  .banner.on{display:block}
+  .banner input{width:100%;margin-top:8px;font-size:16px;border:1px solid var(--line-dark);border-radius:8px;padding:9px 11px}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(104px + env(safe-area-inset-bottom));background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:.82rem;border-radius:999px;padding:10px 18px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;z-index:50}
+  .toast.on{opacity:1}
+
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(250,248,244,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line-dark);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:40}
+  nav button{flex:1;font-family:var(--sans);font-size:.72rem;font-weight:600;background:none;border:none;color:var(--muted);padding:12px 0 10px;cursor:pointer}
+  nav button .ico{display:block;font-size:1.25rem;margin-bottom:2px}
+  nav button.active{color:var(--accent)}
+  .tab{display:none}
+  .tab.on{display:block}
+  .count{font-family:var(--sans);font-size:.78rem;color:var(--muted)}
+  input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<div class="screen">
+  <!-- SHELF TAB -->
+  <div class="tab on" id="tab-shelf">
+    <div class="kicker">Reading Radar</div>
+    <h1>Your library, <em>from a photo</em></h1>
+    <p class="standfirst">Point your camera at a bookshelf. The app reads the spines and builds your library.</p>
+
+    <div class="banner" id="codebanner">
+      This app needs the access code from whoever shared it with you.
+      <input type="password" id="codeinput" placeholder="Access code" autocomplete="off">
+    </div>
+
+    <div class="hero" id="hero">
+      <div class="big">📚 → 📱</div>
+      <p>Scan your first shelf to get started.</p>
+      <div class="hint">Good light, straight-on angle, one shelf at a time works best.</div>
+    </div>
+
+    <div class="btnrow">
+      <label class="btn primary" for="camin">📷 Scan a shelf</label>
+      <input type="file" id="camin" accept="image/*" capture="environment">
+      <label class="btn secondary" for="filein">Choose a photo instead</label>
+      <input type="file" id="filein" accept="image/*">
+    </div>
+
+    <div class="spin" id="scanspin">Reading the spines<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+
+    <div class="panel" id="scanpanel" style="display:none">
+      <h2>Found on this shelf — untick anything wrong</h2>
+      <div id="scanlist"></div>
+      <div class="btnrow">
+        <button class="btn primary" id="addscanned">Add to my library</button>
+        <button class="btn secondary" id="discardscan">Discard</button>
+      </div>
+    </div>
+
+    <div class="panel" id="libpanel" style="display:none">
+      <h2>My library · <span id="libcount"></span></h2>
+      <div id="liblist"></div>
+      <div class="manrow">
+        <input id="mant" placeholder="Add a title manually">
+        <input id="mana" placeholder="Author">
+        <button id="manadd">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PICKS TAB -->
+  <div class="tab" id="tab-picks">
+    <div class="kicker">Reading Radar</div>
+    <h1>What to read <em>next</em></h1>
+    <p class="standfirst" id="pickssub">Recommendations built from your own shelves.</p>
+
+    <div class="btnrow">
+      <button class="btn primary" id="genbtn">✨ Get my recommendations</button>
+    </div>
+    <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+
+    <div id="profilewrap"></div>
+    <div id="pickcards"></div>
+    <div id="purchwrap"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<nav>
+  <button class="active" data-tab="shelf"><span class="ico">📚</span>Shelf</button>
+  <button data-tab="picks"><span class="ico">✨</span>Picks</button>
+</nav>
+
+<script>
+/* ---------- state ---------- */
+let state = {code:'', library:[], picks:[], purchased:[], history:[], profile:''};
+function save(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
+function load(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
+load();
+
+let pendingScan = [];
+const $ = id => document.getElementById(id);
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'), 2200); }
+function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  $('tab-'+b.dataset.tab).classList.add('on');
+  window.scrollTo(0,0);
+}));
+
+/* ---------- access code ---------- */
+$('codeinput').addEventListener('change',e=>{ state.code=e.target.value.trim(); save(); $('codebanner').classList.remove('on'); toast('Code saved — try again'); });
+
+/* ---------- API: call a streaming function, return full text ---------- */
+async function callApi(path, body){
+  const r = await fetch(path, {
+    method:'POST',
+    headers:{'content-type':'application/json','x-app-code':state.code||''},
+    body: JSON.stringify(body)
+  });
+  if(r.status===401){ $('codebanner').classList.add('on'); throw new Error('Access code needed'); }
+  if(!r.ok){ throw new Error('Server error ('+r.status+'). Try again in a moment.'); }
+  // The function streams Claude's SSE straight through; assemble the text.
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf='', text='';
+  while(true){
+    const {done, value} = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split('\n'); buf = lines.pop();
+    for(const line of lines){
+      if(!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if(!payload || payload==='[DONE]') continue;
+      try{
+        const ev = JSON.parse(payload);
+        if(ev.type==='content_block_delta' && ev.delta && ev.delta.text) text += ev.delta.text;
+        if(ev.type==='error') throw new Error(ev.error && ev.error.message || 'API error');
+      }catch(e){ if(e.message && e.message!=='API error' && !(e instanceof SyntaxError)) throw e; }
+    }
+  }
+  return text;
+}
+function extractJson(text){
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}');
+  if(s<0||e<0) throw new Error('No JSON in response');
+  return JSON.parse(cleaned.slice(s, e+1));
+}
+
+/* ---------- shelf scanning ---------- */
+function resizeImage(file){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const MAX=1600;
+      let w=img.width, h=img.height;
+      if(Math.max(w,h)>MAX){ const k=MAX/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      const url=cv.toDataURL('image/jpeg',0.85);
+      resolve(url.split(',')[1]);
+    };
+    img.onerror=reject;
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function handlePhoto(file){
+  if(!file) return;
+  $('scanspin').classList.add('on'); $('scanpanel').style.display='none';
+  try{
+    const b64 = await resizeImage(file);
+    const text = await callApi('/api/scan', {image:b64});
+    const data = extractJson(text);
+    pendingScan = (data.books||[]).filter(b=>b.title);
+    renderScan();
+    if(!pendingScan.length) toast("Couldn't read any spines — try better light");
+  }catch(err){ toast(err.message); }
+  $('scanspin').classList.remove('on');
+}
+$('camin').addEventListener('change',e=>{ handlePhoto(e.target.files[0]); e.target.value=''; });
+$('filein').addEventListener('change',e=>{ handlePhoto(e.target.files[0]); e.target.value=''; });
+
+function renderScan(){
+  if(!pendingScan.length){ $('scanpanel').style.display='none'; return; }
+  $('scanpanel').style.display='block';
+  $('scanlist').innerHTML = pendingScan.map((b,i)=>`
+    <label class="scanrow">
+      <input type="checkbox" data-i="${i}" ${b.confidence==='low'?'':'checked'}>
+      <span><em>${esc(b.title)}</em> <span class="a">${esc(b.author||'')}</span></span>
+      ${b.confidence==='low'?'<span class="lowc">unsure</span>':''}
+    </label>`).join('');
+}
+$('addscanned').addEventListener('click',()=>{
+  let n=0;
+  document.querySelectorAll('#scanlist input:checked').forEach(cb=>{
+    const b=pendingScan[+cb.dataset.i];
+    if(!state.library.some(x=>x.t.toLowerCase()===b.title.toLowerCase())){
+      state.library.push({t:b.title, a:b.author||''}); n++;
+    }
+  });
+  pendingScan=[]; renderScan(); save(); renderLibrary();
+  toast(n+' books added');
+});
+$('discardscan').addEventListener('click',()=>{ pendingScan=[]; renderScan(); });
+
+/* ---------- library ---------- */
+function renderLibrary(){
+  const has = state.library.length>0;
+  $('hero').style.display = has?'none':'block';
+  $('libpanel').style.display = has?'block':'none';
+  $('libcount').textContent = state.library.length+' books';
+  $('liblist').innerHTML = state.library.map((b,i)=>`
+    <div class="libitem"><em>${esc(b.t)}</em><span class="a">${esc(b.a)}</span>
+    <button class="rm" data-i="${i}">✕</button></div>`).join('');
+  document.querySelectorAll('#liblist .rm').forEach(btn=>btn.addEventListener('click',()=>{
+    state.library.splice(+btn.dataset.i,1); save(); renderLibrary();
+  }));
+}
+$('manadd').addEventListener('click',()=>{
+  const t=$('mant').value.trim(), a=$('mana').value.trim();
+  if(!t) return;
+  state.library.push({t, a}); $('mant').value=''; $('mana').value='';
+  save(); renderLibrary();
+});
+
+/* ---------- recommendations ---------- */
+$('genbtn').addEventListener('click', async ()=>{
+  if(state.library.length<3){ toast('Scan a shelf first — I need at least a few books'); return; }
+  $('genbtn').disabled=true; $('recspin').classList.add('on');
+  try{
+    const text = await callApi('/api/recommend', {
+      mode:'monthly',
+      library: state.library,
+      exclude: state.history
+    });
+    const data = extractJson(text);
+    state.profile = data.profile||state.profile;
+    const fresh = (data.picks||[]).map((p,i)=>({ id: Date.now()+'-'+i, ...p }));
+    state.picks = fresh;
+    state.history = state.history.concat(fresh.map(p=>p.title));
+    save(); renderPicks();
+  }catch(err){ toast(err.message); }
+  $('genbtn').disabled=false; $('recspin').classList.remove('on');
+});
+
+const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
+function renderPicks(){
+  $('profilewrap').innerHTML = state.profile ?
+    `<div class="profilebox"><span class="lbl">Your taste profile</span>${esc(state.profile)}</div>` : '';
+  $('pickcards').innerHTML = state.picks.map(p=>`
+    <div class="card" data-id="${p.id}">
+      <span class="cat ${esc(p.category||'backlist')}">${CATNAME[p.category]||'Pick'}</span>
+      <h3>${esc(p.title)}</h3>
+      <div class="author">${esc(p.author)} · ${esc(p.year||'')}</div>
+      <p class="desc">${esc(p.desc)}</p>
+      <div class="why"><span class="lbl">Why it's for you</span>${esc(p.why)}</div>
+      <div class="actions">
+        <button class="act morelike">✚ More like this</button>
+        <button class="act markread">✓ Already read</button>
+        <button class="act markbought">🛒 Bought it</button>
+      </div>
+      <div class="similar" style="display:none"></div>
+    </div>`).join('');
+  renderPurchased();
+  bindCardActions();
+}
+function renderPurchased(){
+  $('purchwrap').innerHTML = state.purchased.length ?
+    `<div class="purchhead">Purchased from your picks</div>`+
+    state.purchased.map(p=>`<div class="purchitem"><em>${esc(p.title)}</em>
+      <span class="a" style="font-family:var(--sans);font-size:.8rem;color:var(--muted)">${esc(p.author)}</span>
+      <span class="badge">On your shelf soon</span></div>`).join('') : '';
+}
+function bindCardActions(){
+  document.querySelectorAll('#pickcards .card').forEach(card=>{
+    const id = card.dataset.id;
+    const pick = ()=> state.picks.find(p=>p.id===id);
+    card.querySelector('.markread').addEventListener('click',()=>{
+      const p=pick(); if(!p) return;
+      state.library.push({t:p.title, a:p.author});
+      state.picks = state.picks.filter(x=>x.id!==id);
+      save(); renderPicks(); renderLibrary();
+      toast('Moved to your library');
+    });
+    card.querySelector('.markbought').addEventListener('click',()=>{
+      const p=pick(); if(!p) return;
+      state.purchased.push(p);
+      state.picks = state.picks.filter(x=>x.id!==id);
+      save(); renderPicks();
+      toast('Marked as purchased 🎉');
+    });
+    card.querySelector('.morelike').addEventListener('click', async ()=>{
+      const p=pick(); if(!p) return;
+      const box = card.querySelector('.similar');
+      box.style.display='block';
+      box.innerHTML='<div class="simcard"><span class="a">Finding books like this…</span></div>';
+      try{
+        const text = await callApi('/api/recommend', {
+          mode:'similar', seed:{title:p.title, author:p.author},
+          library: state.library, exclude: state.history
+        });
+        const data = extractJson(text);
+        const sims = data.picks||[];
+        state.history = state.history.concat(sims.map(s=>s.title)); save();
+        box.innerHTML = sims.map(s=>`<div class="simcard">
+          <div class="t">${esc(s.title)}</div><div class="a">${esc(s.author)} · ${esc(s.year||'')}</div>
+          <div class="d">${esc(s.desc)}</div></div>`).join('') || '<div class="simcard"><span class="a">Nothing found — try again.</span></div>';
+      }catch(err){ box.innerHTML=''; box.style.display='none'; toast(err.message); }
+    });
+  });
+}
+
+/* ---------- init ---------- */
+renderLibrary(); renderPicks();
+</script>
+</body>
+</html>
