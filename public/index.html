@@ -276,8 +276,9 @@
       </div>
     </section>
 
-    <div class="btnrow">
-      <button class="btn primary" id="genbtn">✨ Reveal my next picks</button>
+    <p class="standfirst dark" id="emptyhint" style="display:none;margin-top:18px">📚 Scan your shelf first — once a few books are in your library, your picks appear here automatically.</p>
+    <div class="btnrow" id="genrow" style="display:none">
+      <button class="btn secondary" id="genbtn">↻ Refresh with a new batch</button>
     </div>
     <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 
@@ -291,7 +292,7 @@
 
 <nav>
   <button class="active" data-tab="shelf"><span class="ico">📚</span>My bookshelf</button>
-  <button data-tab="picks"><span class="ico">✨</span>Reveal my next picks</button>
+  <button data-tab="picks"><span class="ico">✨</span>Reveal my next books</button>
 </nav>
 
 <script>
@@ -351,7 +352,12 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   $('tab-'+b.dataset.tab).classList.add('on');
   window.scrollTo(0,0);
-  if(b.dataset.tab==='shelf') startCamera(); else stopCamera();
+  if(b.dataset.tab==='shelf'){ startCamera(); }
+  else{
+    stopCamera();
+    /* the magic starts the moment you arrive: no picks yet → generate right away */
+    if(!state.picks.length && !genBusy) generate(); else updateGenUI();
+  }
 }));
 
 /* ---------- access code ---------- */
@@ -531,9 +537,18 @@ $('manadd').addEventListener('click',()=>{
 });
 
 /* ---------- recommendations ---------- */
-$('genbtn').addEventListener('click', async ()=>{
-  if(state.library.length<3){ toast('Scan a shelf first — I need at least a few books'); return; }
-  $('genbtn').disabled=true; $('recspin').classList.add('on');
+let genBusy = false;
+function updateGenUI(){
+  if(genBusy){ $('genrow').style.display='none'; $('emptyhint').style.display='none'; return; }
+  const hasPicks = state.picks.length>0;
+  const canGen = state.library.length>=3;
+  $('genrow').style.display = hasPicks ? 'flex' : 'none';
+  $('emptyhint').style.display = (!hasPicks && !canGen) ? 'block' : 'none';
+}
+async function generate(){
+  if(genBusy) return;
+  if(state.library.length<3){ updateGenUI(); toast('Scan a shelf first — I need at least a few books'); return; }
+  genBusy=true; updateGenUI(); $('recspin').classList.add('on');
   try{
     const text = await callApi('/api/recommend', {
       mode:'monthly',
@@ -547,8 +562,9 @@ $('genbtn').addEventListener('click', async ()=>{
     state.history = state.history.concat(fresh.map(p=>p.title));
     save(); renderPicks();
   }catch(err){ toast(err.message); }
-  $('genbtn').disabled=false; $('recspin').classList.remove('on');
-});
+  genBusy=false; $('recspin').classList.remove('on'); updateGenUI();
+}
+$('genbtn').addEventListener('click', generate);
 
 /* ---------- filters & editorial picks view ---------- */
 const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
@@ -615,6 +631,7 @@ function renderPicks(){
     </div>`).join('');
   renderPurchased();
   bindCardActions();
+  updateGenUI();
 }
 function renderPurchased(){
   $('purchwrap').innerHTML = state.purchased.length ?
