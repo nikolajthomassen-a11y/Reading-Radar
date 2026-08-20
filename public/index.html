@@ -100,6 +100,13 @@
   .libitem:last-child{border-bottom:none}
   .libitem .a{color:var(--muted);font-size:.82rem;font-family:var(--sans)}
   .libitem .rm{margin-left:auto;font-family:var(--sans);font-size:.9rem;color:var(--muted);background:none;border:none;padding:4px 8px;cursor:pointer}
+  .libitem .txt{cursor:pointer;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0}
+  .libitem.editing{flex-direction:column;align-items:stretch;gap:5px}
+  .libedit{width:100%;box-sizing:border-box;border:1px solid var(--accent);border-radius:8px;padding:6px 8px;background:#fff;color:inherit;-webkit-appearance:none}
+  .libedit.t{font-family:var(--serif);font-style:italic;font-size:.95rem}
+  .libedit.a{font-family:var(--sans);font-size:.82rem}
+  .libedit:focus{outline:none}
+  .libdone{align-self:flex-end;font-family:var(--sans);font-size:.8rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:999px;padding:6px 14px;cursor:pointer}
   .scanrow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
   .scanrow:last-child{border-bottom:none}
   .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent);flex:none;margin-top:9px}
@@ -566,16 +573,40 @@ $('addscanned').addEventListener('click',()=>{
 $('discardscan').addEventListener('click',()=>{ pendingScan=[]; renderScan(); });
 
 /* ---------- library ---------- */
+let libEditing = -1; // index of the row currently in edit mode
 function renderLibrary(){
   const has = state.library.length>0;
   $('libpanel').style.display = has?'block':'none';
   $('libcount').textContent = state.library.length+' books';
-  $('liblist').innerHTML = state.library.map((b,i)=>`
-    <div class="libitem"><em>${esc(b.t)}</em><span class="a">${esc(b.a)}</span>
+  $('liblist').innerHTML = state.library.map((b,i)=> i===libEditing ? `
+    <div class="libitem editing">
+      <input class="libedit t" data-i="${i}" value="${esc(b.t)}" placeholder="Title" spellcheck="false" autocapitalize="words">
+      <input class="libedit a" data-i="${i}" value="${esc(b.a)}" placeholder="Author" spellcheck="false" autocapitalize="words">
+      <button class="libdone" data-i="${i}">Done</button>
+    </div>` : `
+    <div class="libitem"><span class="txt" data-i="${i}" title="Tap to edit"><em>${esc(b.t)}</em><span class="a">${esc(b.a)}</span></span>
     <button class="rm" data-i="${i}">✕</button></div>`).join('');
   document.querySelectorAll('#liblist .rm').forEach(btn=>btn.addEventListener('click',()=>{
-    state.library.splice(+btn.dataset.i,1); save(); renderLibrary();
+    state.library.splice(+btn.dataset.i,1);
+    if(libEditing===+btn.dataset.i) libEditing=-1;
+    save(); renderLibrary();
   }));
+  // Tap a book to correct its title or author in place.
+  document.querySelectorAll('#liblist .txt').forEach(el=>el.addEventListener('click',()=>{
+    libEditing=+el.dataset.i; renderLibrary();
+    const inp=document.querySelector('#liblist .libedit.t'); if(inp) inp.focus();
+  }));
+  document.querySelectorAll('#liblist .libedit').forEach(inp=>inp.addEventListener('input',e=>{
+    const b=state.library[+e.target.dataset.i]; if(!b) return;
+    if(e.target.classList.contains('t')) b.t=e.target.value; else b.a=e.target.value;
+  }));
+  const doneBtn=document.querySelector('#liblist .libdone');
+  if(doneBtn) doneBtn.addEventListener('click',()=>{
+    const b=state.library[+doneBtn.dataset.i];
+    if(b && !b.t.trim()) state.library.splice(+doneBtn.dataset.i,1); // emptied title = remove
+    else if(b){ b.t=b.t.trim(); b.a=b.a.trim(); }
+    libEditing=-1; save(); renderLibrary();
+  });
   renderSyncLink();
 }
 $('manadd').addEventListener('click',()=>{
