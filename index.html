@@ -4,15 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#faf8f4">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e3d2e">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <title>Reading Radar</title>
 <style>
   :root{
+    --g1:#0e3d2e; --g2:#43b58c;            /* gradient pair: deep evergreen → fresh mint */
     --paper:#faf8f4; --card:#ffffff; --ink:#171512; --body:#3d3833; --muted:#8a8378;
-    --accent:#1f5c43; --accent-ink:#17462f;
+    --accent:#1f5c43; --accent-ink:#17462f; --mint:#bfeeda;
     --line:#eae5dc; --line-dark:#d9d2c6;
     --new:#1f5c43; --new-bg:#e7f0ea;
     --back:#a3502e; --back-bg:#f7ebe3;
@@ -24,12 +25,66 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:var(--serif);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .screen{max-width:640px;margin:0 auto;padding:22px 18px calc(96px + env(safe-area-inset-bottom))}
 
+  /* ── Gradient hero (Shelf tab) ── */
+  .hero-bg{
+    background:linear-gradient(160deg,var(--g1) 0%, #1c7a58 55%, var(--g2) 115%);
+    padding:calc(18px + env(safe-area-inset-top)) 18px 30px;
+    border-radius:0 0 28px 28px;
+  }
+  .hero-inner{max-width:640px;margin:0 auto}
+  .hero-bg .kicker{font-family:var(--sans);font-size:.68rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--mint)}
+  .hero-bg h1{font-size:1.95rem;font-weight:400;letter-spacing:-.02em;line-height:1.12;margin-top:6px;color:#fff}
+  .hero-bg h1 em{font-style:italic;color:var(--mint)}
+  .hero-bg .standfirst{font-family:var(--sans);font-size:.84rem;color:rgba(255,255,255,.75);margin-top:8px}
+
+  /* ── Viewfinder ── */
+  .vfwrap{position:relative;margin-top:18px;border-radius:20px;overflow:hidden;background:#08251c;aspect-ratio:3/4;max-height:41vh;margin-left:auto;margin-right:auto;box-shadow:0 18px 40px -18px rgba(0,0,0,.5)}
+  #vf{width:100%;height:100%;object-fit:cover;display:block}
+  @media (min-height:780px){ .vfwrap{max-height:52vh} }
+  @media (min-height:900px){ .vfwrap{max-height:56vh} }
+  /* Short phones: drop the intro line so the portrait frame stays usably wide. */
+  @media (max-height:720px){ .hero-inner .standfirst{display:none} .vfwrap{max-height:50vh;margin-top:12px} }
+  .guide{position:absolute;inset:14px;border-radius:14px;pointer-events:none}
+  .guide i{position:absolute;width:26px;height:26px;border:2.5px solid rgba(255,255,255,.85)}
+  .guide i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0}
+  .guide i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none;border-radius:0 8px 0 0}
+  .guide i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 8px}
+  .guide i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 8px 0}
+  .vfcaption{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-family:var(--sans);font-size:.74rem;font-weight:500;color:rgba(255,255,255,.85);text-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .08s}
+  .flash.on{opacity:.85}
+  .vfscan{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,37,28,.55);backdrop-filter:blur(3px)}
+  .vfscan.on{display:flex}
+  .vfscan .msg{font-family:var(--sans);font-size:.86rem;font-weight:600;color:#fff;text-align:center}
+  .vfscan .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mint);margin:0 3px;animation:b 1.2s infinite}
+  .vfscan .dot:nth-child(2){animation-delay:.2s}.vfscan .dot:nth-child(3){animation-delay:.4s}
+  @keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+  .vferror{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:#fff;font-family:var(--sans);font-size:.86rem;background:#08251c}
+  .vferror.on{display:flex}
+
+  /* ── Apple-style shutter ── */
+  .shutterrow{display:flex;align-items:center;justify-content:center;margin-top:20px;position:relative}
+  .shutter{
+    width:80px;height:80px;border-radius:50%;cursor:pointer;background:transparent;
+    border:4.5px solid #fff;padding:0;display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .shutter i{display:block;width:62px;height:62px;border-radius:50%;background:#fff;transition:transform .1s ease}
+  .shutter:active i{transform:scale(.85)}
+  .shutter:disabled{opacity:.45}
+  .altpick{position:absolute;right:6px;font-family:var(--sans);font-size:.76rem;font-weight:500;color:rgba(255,255,255,.85);background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 13px;cursor:pointer}
+
+  /* Desktop note shown instead of the camera */
+  .deskscan{display:none;margin-top:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:16px 18px;font-family:var(--sans);font-size:.88rem;color:#fff}
+
+  /* ── Body content ── */
+  .screen{max-width:640px;margin:0 auto;padding:0 18px calc(96px + env(safe-area-inset-bottom))}
+  .pad-top{padding-top:calc(22px + env(safe-area-inset-top))}
   .kicker{font-family:var(--sans);font-size:.68rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
-  h1{font-size:1.9rem;font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-top:6px}
-  h1 em{font-style:italic;color:var(--accent-ink)}
-  .standfirst{font-family:var(--sans);font-size:.84rem;color:var(--muted);margin-top:8px}
+  h1.dark{font-size:1.9rem;font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-top:6px}
+  h1.dark em{font-style:italic;color:var(--accent-ink)}
+  .standfirst.dark{font-family:var(--sans);font-size:.84rem;color:var(--muted);margin-top:8px}
 
   .btn{font-family:var(--sans);font-size:.9rem;font-weight:600;border:none;border-radius:12px;padding:14px 18px;cursor:pointer;width:100%;text-align:center;display:block}
   .btn.primary{background:var(--accent);color:#fff}
@@ -41,25 +96,49 @@
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
   .panel h2{font-family:var(--sans);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
 
-  .hero{text-align:center;padding:34px 16px;border:1.5px dashed var(--line-dark);border-radius:16px;margin-top:20px;background:var(--card)}
-  .hero .big{font-size:2.2rem}
-  .hero p{font-size:.98rem;color:var(--body);margin-top:8px}
-  .hero .hint{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:6px}
-
   .libitem{display:flex;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.95rem}
   .libitem:last-child{border-bottom:none}
   .libitem .a{color:var(--muted);font-size:.82rem;font-family:var(--sans)}
   .libitem .rm{margin-left:auto;font-family:var(--sans);font-size:.9rem;color:var(--muted);background:none;border:none;padding:4px 8px;cursor:pointer}
-  .scanrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .scanrow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
   .scanrow:last-child{border-bottom:none}
-  .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent)}
-  .scanrow .lowc{font-family:var(--sans);font-size:.68rem;color:var(--back);background:var(--back-bg);border-radius:999px;padding:2px 8px}
+  .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent);flex:none;margin-top:9px}
+  .scanrow .lowc{font-family:var(--sans);font-size:.68rem;color:var(--back);background:var(--back-bg);border-radius:999px;padding:2px 8px;flex:none;align-self:flex-start;margin-top:8px}
+  .scanrow.unsure{background:rgba(176,133,20,.07)}
+  .scanfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .scanedit{width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:8px;padding:5px 7px;background:transparent;color:inherit;-webkit-appearance:none}
+  .scanedit.t{font-family:var(--serif);font-style:italic;font-size:.95rem}
+  .scanedit.a{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+  .scanedit:focus{outline:none;border-color:var(--accent);background:#fff}
+  .scanhint{font-family:var(--sans);font-size:.75rem;color:var(--muted);padding:0 0 8px}
   .manrow{display:flex;gap:8px;margin-top:10px}
   .manrow input{flex:1;font-family:var(--sans);font-size:16px;border:1px solid var(--line-dark);border-radius:10px;padding:10px 12px;background:var(--card);min-width:0}
   .manrow button{font-family:var(--sans);font-weight:600;font-size:.85rem;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer}
 
+  .syncrow{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+  .syncrow .linkbox{display:flex;gap:8px;margin-top:8px}
+  .syncrow input{flex:1;font-family:var(--sans);font-size:.78rem;border:1px solid var(--line-dark);border-radius:8px;padding:8px 10px;color:var(--muted);background:var(--paper);min-width:0}
+  .syncrow button{font-family:var(--sans);font-weight:600;font-size:.78rem;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer}
+
   .profilebox{background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:12px;padding:14px 16px;margin-top:16px;font-size:.94rem;color:var(--accent-ink)}
   .profilebox .lbl{display:block;font-family:var(--sans);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+
+  /* ── Editorial picks page (the "book radar" view) ── */
+  .headrule{border:none;border-top:1px solid var(--line-dark);margin:22px 0 0}
+  .tasteprof{display:grid;grid-template-columns:1fr;gap:10px;padding:20px 0 22px;border-bottom:1px solid var(--line-dark)}
+  .tasteprof h2{font-family:var(--sans);font-size:.7rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-top:4px}
+  .tasteprof p{font-size:1.02rem;color:var(--body)}
+  .pillhint{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:14px}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .pill{font-family:var(--sans);font-size:.72rem;font-weight:500;color:var(--body);border:1px solid var(--line-dark);background:var(--card);border-radius:999px;padding:5px 13px;cursor:pointer}
+  .pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--paper) 82%,rgba(250,248,244,0));padding:16px 0 14px}
+  .fbtn{font-family:var(--sans);font-size:.78rem;font-weight:500;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:8px 15px;cursor:pointer}
+  .fbtn.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .count{font-family:var(--sans);font-size:.76rem;color:var(--muted);align-self:center;margin-left:auto}
+  .card .meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;font-family:var(--sans);font-size:.76rem;color:var(--muted)}
+  .card .meta a{color:var(--accent);font-weight:500;text-decoration:none}
+  .card .meta a:hover{text-decoration:underline}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
   .cat{font-family:var(--sans);font-size:.64rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;margin-bottom:10px}
@@ -73,6 +152,7 @@
   .card .desc{margin-top:8px;font-size:.94rem;color:var(--body)}
   .card .why{margin-top:10px;font-size:.9rem;color:var(--accent-ink);background:linear-gradient(to right,var(--new-bg),rgba(231,240,234,.35));border-radius:10px;padding:10px 13px}
   .card .why .lbl{display:block;font-family:var(--sans);font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+  .card .gtags{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:10px}
   .actions{display:flex;gap:8px;margin-top:12px}
   .act{flex:1;font-family:var(--sans);font-size:.76rem;font-weight:600;border:1px solid var(--line-dark);background:var(--card);color:var(--body);border-radius:999px;padding:9px 4px;cursor:pointer}
   .act:active{background:var(--paper)}
@@ -91,7 +171,6 @@
   .spin.on{display:block}
   .spin .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin:0 3px;animation:b 1.2s infinite}
   .spin .dot:nth-child(2){animation-delay:.2s}.spin .dot:nth-child(3){animation-delay:.4s}
-  @keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 
   .banner{display:none;background:var(--back-bg);color:var(--back);font-family:var(--sans);font-size:.84rem;border-radius:12px;padding:12px 14px;margin-top:14px}
   .banner.on{display:block}
@@ -100,47 +179,70 @@
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(104px + env(safe-area-inset-bottom));background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:.82rem;border-radius:999px;padding:10px 18px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;z-index:50}
   .toast.on{opacity:1}
 
-  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(250,248,244,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line-dark);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:40}
-  nav button{flex:1;font-family:var(--sans);font-size:.72rem;font-weight:600;background:none;border:none;color:var(--muted);padding:12px 0 10px;cursor:pointer}
-  nav button .ico{display:block;font-size:1.25rem;margin-bottom:2px}
-  nav button.active{color:var(--accent)}
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(250,248,244,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line-dark);display:flex;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:40}
+  nav button{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;font-family:var(--sans);font-size:.9rem;font-weight:600;line-height:1.2;background:var(--card);border:1.5px solid var(--line-dark);border-radius:14px;color:var(--body);padding:15px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  nav button .ico{font-size:1.25rem}
+  nav button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  nav button:active{transform:scale(.98)}
+  @media(max-width:380px){nav button{font-size:.8rem;gap:6px}}
   .tab{display:none}
   .tab.on{display:block}
-  .count{font-family:var(--sans);font-size:.78rem;color:var(--muted)}
   input[type=file]{display:none}
+
+  /* ── Desktop overview layout ── */
+  @media(min-width:900px){
+    .hero-inner,.screen{max-width:1000px}
+    .vfwrap,.shutterrow{display:none}
+    .deskscan{display:block}
+    .tasteprof{grid-template-columns:160px 1fr;gap:24px;padding:28px 0 30px}
+    #pickcards{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-top:14px}
+    #pickcards .card{margin-top:0}
+    #liblist{column-count:2;column-gap:32px}
+    .libitem{break-inside:avoid}
+  }
 </style>
 </head>
 <body>
 
-<div class="screen">
-  <!-- SHELF TAB -->
-  <div class="tab on" id="tab-shelf">
-    <div class="kicker">Reading Radar</div>
-    <h1>Your library, <em>from a photo</em></h1>
-    <p class="standfirst">Point your camera at a bookshelf. The app reads the spines and builds your library.</p>
+<!-- SHELF TAB -->
+<div class="tab on" id="tab-shelf">
+  <div class="hero-bg">
+    <div class="hero-inner">
+      <div class="kicker">Reading Radar</div>
+      <h1>Scan your shelves,<br>meet your <em>next book</em></h1>
+      <p class="standfirst">Hold the phone upright, fit one shelf in the frame and tap the shutter. The spines become your library.</p>
 
+      <div class="vfwrap">
+        <video id="vf" autoplay playsinline muted></video>
+        <div class="guide"><i></i><i></i><i></i><i></i></div>
+        <div class="vfcaption">Fit one shelf in the frame</div>
+        <div class="flash" id="flash"></div>
+        <div class="vfscan" id="vfscan"><div class="msg">Reading the spines<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+        <div class="vferror" id="vferror">
+          <div>Camera not available.<br>Allow camera access for this site in Settings, or use a photo instead.</div>
+          <label class="altpick" for="filein" style="position:static">Choose a photo</label>
+        </div>
+      </div>
+
+      <div class="shutterrow">
+        <button class="shutter" id="shutter" aria-label="Scan shelf"><i></i></button>
+        <label class="altpick" for="filein">Photo</label>
+      </div>
+      <input type="file" id="filein" accept="image/*">
+
+      <div class="deskscan">📱 Scanning happens on your phone — this is the big-screen view of the same library. Changes sync automatically both ways.</div>
+    </div>
+  </div>
+
+  <div class="screen">
     <div class="banner" id="codebanner">
       This app needs the access code from whoever shared it with you.
       <input type="password" id="codeinput" placeholder="Access code" autocomplete="off">
     </div>
 
-    <div class="hero" id="hero">
-      <div class="big">📚 → 📱</div>
-      <p>Scan your first shelf to get started.</p>
-      <div class="hint">Good light, straight-on angle, one shelf at a time works best.</div>
-    </div>
-
-    <div class="btnrow">
-      <label class="btn primary" for="camin">📷 Scan a shelf</label>
-      <input type="file" id="camin" accept="image/*" capture="environment">
-      <label class="btn secondary" for="filein">Choose a photo instead</label>
-      <input type="file" id="filein" accept="image/*">
-    </div>
-
-    <div class="spin" id="scanspin">Reading the spines<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-
     <div class="panel" id="scanpanel" style="display:none">
-      <h2>Found on this shelf — untick anything wrong</h2>
+      <h2>Found on this shelf</h2>
+      <div class="scanhint">Tap a title or author to correct it. Untick anything that isn't yours.</div>
       <div id="scanlist"></div>
       <div class="btnrow">
         <button class="btn primary" id="addscanned">Add to my library</button>
@@ -156,21 +258,43 @@
         <input id="mana" placeholder="Author">
         <button id="manadd">Add</button>
       </div>
+      <div class="syncrow">
+        Open your library on another device — same books, same picks, bigger screen:
+        <div class="linkbox">
+          <input id="synclink" readonly>
+          <button id="copylink">Copy</button>
+        </div>
+      </div>
     </div>
   </div>
+</div>
 
-  <!-- PICKS TAB -->
-  <div class="tab" id="tab-picks">
-    <div class="kicker">Reading Radar</div>
-    <h1>What to read <em>next</em></h1>
-    <p class="standfirst" id="pickssub">Recommendations built from your own shelves.</p>
+<!-- PICKS TAB -->
+<div class="tab" id="tab-picks">
+  <div class="screen pad-top">
+    <header>
+      <div class="kicker">Reading Radar</div>
+      <h1 class="dark">What to read <em>next</em></h1>
+      <p class="standfirst dark">Recommendations drawn from your own shelves — new releases, backlist gems, award winners and the occasional wildcard.</p>
+      <hr class="headrule">
+    </header>
 
-    <div class="btnrow">
-      <button class="btn primary" id="genbtn">✨ Get my recommendations</button>
+    <section class="tasteprof" id="tasteprof" style="display:none">
+      <h2>Your taste<br>profile</h2>
+      <div>
+        <p id="proftext"></p>
+        <div class="pillhint">Tap a genre to filter your picks — combine as many as you like:</div>
+        <div class="pills" id="genrepills"></div>
+      </div>
+    </section>
+
+    <p class="standfirst dark" id="emptyhint" style="display:none;margin-top:18px">📚 Scan your shelf first — once a few books are in your library, your picks appear here automatically.</p>
+    <div class="btnrow" id="genrow" style="display:none">
+      <button class="btn secondary" id="genbtn">↻ Refresh with a new batch</button>
     </div>
     <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 
-    <div id="profilewrap"></div>
+    <div class="toolbar" id="cattoolbar" style="display:none"></div>
     <div id="pickcards"></div>
     <div id="purchwrap"></div>
   </div>
@@ -179,16 +303,54 @@
 <div class="toast" id="toast"></div>
 
 <nav>
-  <button class="active" data-tab="shelf"><span class="ico">📚</span>Shelf</button>
-  <button data-tab="picks"><span class="ico">✨</span>Picks</button>
+  <button class="active" data-tab="shelf"><span class="ico">📚</span>My bookshelf</button>
+  <button data-tab="picks"><span class="ico">✨</span>Reveal my next books</button>
 </nav>
 
 <script>
-/* ---------- state ---------- */
-let state = {code:'', library:[], picks:[], purchased:[], history:[], profile:''};
-function save(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
-function load(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
-load();
+/* ---------- state & sync ---------- */
+let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], profile:''};
+function saveLocal(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
+function loadLocal(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
+loadLocal();
+
+function randId(){ const c='abcdefghjkmnpqrstuvwxyz23456789'; let s=''; for(let i=0;i<10;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+/* adopt a sync id from a shared link: site/#s=xxxx */
+(function(){
+  const m = location.hash.match(/s=([A-Za-z0-9_-]+)/);
+  if(m){ state.syncId = m[1]; state.rev = 0; history.replaceState(null,'',location.pathname); }
+  if(!state.syncId) state.syncId = randId();
+  saveLocal();
+})();
+
+let pushTimer=null;
+function save(){                      /* save locally + push to the cloud (debounced) */
+  state.rev = Date.now(); saveLocal();
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async ()=>{
+    try{
+      const payload = Object.assign({}, state); delete payload.code;
+      await fetch('/api/state?id='+state.syncId, {
+        method:'POST', headers:{'content-type':'application/json','x-app-code':state.code||''},
+        body: JSON.stringify(payload)
+      });
+    }catch(e){}
+  }, 1200);
+}
+async function pull(){
+  try{
+    const r = await fetch('/api/state?id='+state.syncId, {headers:{'x-app-code':state.code||''}});
+    if(r.status===401){ $('codebanner').classList.add('on'); return; }
+    if(!r.ok) return;
+    const remote = await r.json();
+    if(remote && remote.rev && remote.rev > (state.rev||0)){
+      const code = state.code;
+      state = Object.assign(state, remote);
+      state.code = code; saveLocal();
+      renderLibrary(); renderPicks();
+    }
+  }catch(e){}
+}
 
 let pendingScan = [];
 const $ = id => document.getElementById(id);
@@ -202,12 +364,27 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   $('tab-'+b.dataset.tab).classList.add('on');
   window.scrollTo(0,0);
+  if(b.dataset.tab==='shelf'){ startCamera(); }
+  else{
+    stopCamera();
+    /* the magic starts the moment you arrive: no picks yet → generate right away */
+    if(!state.picks.length && !genBusy) generate(); else updateGenUI();
+  }
 }));
 
 /* ---------- access code ---------- */
-$('codeinput').addEventListener('change',e=>{ state.code=e.target.value.trim(); save(); $('codebanner').classList.remove('on'); toast('Code saved — try again'); });
+$('codeinput').addEventListener('change',e=>{ state.code=e.target.value.trim(); saveLocal(); $('codebanner').classList.remove('on'); toast('Code saved — try again'); pull(); });
 
-/* ---------- API: call a streaming function, return full text ---------- */
+/* ---------- sync link ---------- */
+function renderSyncLink(){
+  $('synclink').value = location.origin + '/#s=' + state.syncId;
+}
+$('copylink').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText($('synclink').value); toast('Link copied — open it on your computer'); }
+  catch(e){ $('synclink').select(); toast('Long-press the link to copy it'); }
+});
+
+/* ---------- API ---------- */
 async function callApi(path, body){
   const r = await fetch(path, {
     method:'POST',
@@ -216,7 +393,6 @@ async function callApi(path, body){
   });
   if(r.status===401){ $('codebanner').classList.add('on'); throw new Error('Access code needed'); }
   if(!r.ok){ throw new Error('Server error ('+r.status+'). Try again in a moment.'); }
-  // The function streams Claude's SSE straight through; assemble the text.
   const reader = r.body.getReader();
   const dec = new TextDecoder();
   let buf='', text='';
@@ -245,55 +421,132 @@ function extractJson(text){
   return JSON.parse(cleaned.slice(s, e+1));
 }
 
-/* ---------- shelf scanning ---------- */
-function resizeImage(file){
+/* ---------- live viewfinder ---------- */
+let stream = null;
+const isDesktop = ()=> window.matchMedia('(min-width:900px)').matches;
+async function startCamera(){
+  if(stream || isDesktop()) return;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:2880}, height:{ideal:3840}, aspectRatio:{ideal:3/4} },
+      audio:false
+    });
+    $('vf').srcObject = stream;
+    $('vferror').classList.remove('on');
+    $('shutter').disabled = false;
+  }catch(err){
+    stream = null;
+    $('vferror').classList.add('on');
+    $('shutter').disabled = true;
+  }
+}
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; $('vf').srcObject=null; }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) stopCamera();
+  else if($('tab-shelf').classList.contains('on')){ startCamera(); pull(); }
+});
+
+function frameToBase64(){
+  const v = $('vf');
+  const vw=v.videoWidth, vh=v.videoHeight;
+  if(!vw||!vh) return null;
+  // The preview is object-fit:cover, so it shows a centre crop of the camera frame.
+  // Send that same crop — otherwise people scan shelves they never saw in the frame,
+  // and the wasted margins eat the pixel budget that spine text needs.
+  const box = v.getBoundingClientRect();
+  const boxAR = (box.width>0 && box.height>0) ? box.width/box.height : 3/4;
+  let sx=0, sy=0, sw=vw, sh=vh;
+  if(vw/vh > boxAR){ sw=Math.round(vh*boxAR); sx=Math.round((vw-sw)/2); }
+  else            { sh=Math.round(vw/boxAR); sy=Math.round((vh-sh)/2); }
+  const MAX=2000;
+  let w=sw, h=sh;
+  if(Math.max(w,h)>MAX){ const k=MAX/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  cv.getContext('2d').drawImage(v, sx,sy,sw,sh, 0,0,w,h);
+  return cv.toDataURL('image/jpeg',0.92).split(',')[1];
+}
+
+async function scanImage(b64){
+  $('vfscan').classList.add('on'); $('shutter').disabled=true;
+  try{
+    const text = await callApi('/api/scan', {image:b64});
+    const data = extractJson(text);
+    const found = (data.books||[]).filter(b=>b.title);
+    found.forEach(b=>{
+      if(!pendingScan.some(x=>x.title.toLowerCase()===b.title.toLowerCase())) pendingScan.push(b);
+    });
+    renderScan();
+    if(found.length){ toast(found.length+' spines read — scan the next shelf or confirm below'); $('scanpanel').scrollIntoView({behavior:'smooth', block:'nearest'}); }
+    else toast("Couldn't read any spines — try better light");
+  }catch(err){ toast(err.message); }
+  $('vfscan').classList.remove('on'); $('shutter').disabled=false;
+}
+
+$('shutter').addEventListener('click', async ()=>{
+  const b64 = frameToBase64();
+  if(!b64){ toast('Camera is still starting'); return; }
+  const f=$('flash'); f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),110);
+  await scanImage(b64);
+});
+
+/* photo fallback */
+function resizeFile(file){
   return new Promise((resolve,reject)=>{
     const img = new Image();
     img.onload = ()=>{
-      const MAX=1600;
+      const MAX=2000;
       let w=img.width, h=img.height;
       if(Math.max(w,h)>MAX){ const k=MAX/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
       const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
       cv.getContext('2d').drawImage(img,0,0,w,h);
-      const url=cv.toDataURL('image/jpeg',0.85);
-      resolve(url.split(',')[1]);
+      resolve(cv.toDataURL('image/jpeg',0.92).split(',')[1]);
     };
     img.onerror=reject;
     img.src=URL.createObjectURL(file);
   });
 }
-async function handlePhoto(file){
+$('filein').addEventListener('change', async e=>{
+  const file=e.target.files[0]; e.target.value='';
   if(!file) return;
-  $('scanspin').classList.add('on'); $('scanpanel').style.display='none';
-  try{
-    const b64 = await resizeImage(file);
-    const text = await callApi('/api/scan', {image:b64});
-    const data = extractJson(text);
-    pendingScan = (data.books||[]).filter(b=>b.title);
-    renderScan();
-    if(!pendingScan.length) toast("Couldn't read any spines — try better light");
-  }catch(err){ toast(err.message); }
-  $('scanspin').classList.remove('on');
-}
-$('camin').addEventListener('change',e=>{ handlePhoto(e.target.files[0]); e.target.value=''; });
-$('filein').addEventListener('change',e=>{ handlePhoto(e.target.files[0]); e.target.value=''; });
+  try{ await scanImage(await resizeFile(file)); }catch(err){ toast('Could not read that photo'); }
+});
 
+/* ---------- scan confirm ---------- */
 function renderScan(){
   if(!pendingScan.length){ $('scanpanel').style.display='none'; return; }
   $('scanpanel').style.display='block';
   $('scanlist').innerHTML = pendingScan.map((b,i)=>`
-    <label class="scanrow">
+    <div class="scanrow${b.confidence==='low'?' unsure':''}">
       <input type="checkbox" data-i="${i}" ${b.confidence==='low'?'':'checked'}>
-      <span><em>${esc(b.title)}</em> <span class="a">${esc(b.author||'')}</span></span>
-      ${b.confidence==='low'?'<span class="lowc">unsure</span>':''}
-    </label>`).join('');
+      <div class="scanfields">
+        <input class="scanedit t" data-i="${i}" value="${esc(b.title)}" placeholder="Title" spellcheck="false" autocapitalize="words">
+        <input class="scanedit a" data-i="${i}" value="${esc(b.author||'')}" placeholder="Author" spellcheck="false" autocapitalize="words">
+      </div>
+      ${b.confidence==='low'?'<span class="lowc">check</span>':''}
+    </div>`).join('');
+  // Editing a row keeps it in the list: a corrected book is never silently dropped.
+  document.querySelectorAll('#scanlist .scanedit').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      const i=+e.target.dataset.i;
+      if(!pendingScan[i]) return;
+      if(e.target.classList.contains('t')) pendingScan[i].title=e.target.value;
+      else pendingScan[i].author=e.target.value;
+      const cb=document.querySelector('#scanlist input[type=checkbox][data-i="'+i+'"]');
+      if(cb && !cb.checked && e.target.value.trim()) cb.checked=true;
+    });
+  });
 }
 $('addscanned').addEventListener('click',()=>{
   let n=0;
-  document.querySelectorAll('#scanlist input:checked').forEach(cb=>{
+  document.querySelectorAll('#scanlist input[type=checkbox]:checked').forEach(cb=>{
     const b=pendingScan[+cb.dataset.i];
-    if(!state.library.some(x=>x.t.toLowerCase()===b.title.toLowerCase())){
-      state.library.push({t:b.title, a:b.author||''}); n++;
+    if(!b) return;
+    const t=(b.title||'').trim(), a=(b.author||'').trim();
+    if(!t) return;
+    if(!state.library.some(x=>x.t.toLowerCase()===t.toLowerCase())){
+      state.library.push({t, a}); n++;
     }
   });
   pendingScan=[]; renderScan(); save(); renderLibrary();
@@ -304,7 +557,6 @@ $('discardscan').addEventListener('click',()=>{ pendingScan=[]; renderScan(); })
 /* ---------- library ---------- */
 function renderLibrary(){
   const has = state.library.length>0;
-  $('hero').style.display = has?'none':'block';
   $('libpanel').style.display = has?'block':'none';
   $('libcount').textContent = state.library.length+' books';
   $('liblist').innerHTML = state.library.map((b,i)=>`
@@ -313,6 +565,7 @@ function renderLibrary(){
   document.querySelectorAll('#liblist .rm').forEach(btn=>btn.addEventListener('click',()=>{
     state.library.splice(+btn.dataset.i,1); save(); renderLibrary();
   }));
+  renderSyncLink();
 }
 $('manadd').addEventListener('click',()=>{
   const t=$('mant').value.trim(), a=$('mana').value.trim();
@@ -322,9 +575,18 @@ $('manadd').addEventListener('click',()=>{
 });
 
 /* ---------- recommendations ---------- */
-$('genbtn').addEventListener('click', async ()=>{
-  if(state.library.length<3){ toast('Scan a shelf first — I need at least a few books'); return; }
-  $('genbtn').disabled=true; $('recspin').classList.add('on');
+let genBusy = false;
+function updateGenUI(){
+  if(genBusy){ $('genrow').style.display='none'; $('emptyhint').style.display='none'; return; }
+  const hasPicks = state.picks.length>0;
+  const canGen = state.library.length>=3;
+  $('genrow').style.display = hasPicks ? 'flex' : 'none';
+  $('emptyhint').style.display = (!hasPicks && !canGen) ? 'block' : 'none';
+}
+async function generate(){
+  if(genBusy) return;
+  if(state.library.length<3){ updateGenUI(); toast('Scan a shelf first — I need at least a few books'); return; }
+  genBusy=true; updateGenUI(); $('recspin').classList.add('on');
   try{
     const text = await callApi('/api/recommend', {
       mode:'monthly',
@@ -338,20 +600,66 @@ $('genbtn').addEventListener('click', async ()=>{
     state.history = state.history.concat(fresh.map(p=>p.title));
     save(); renderPicks();
   }catch(err){ toast(err.message); }
-  $('genbtn').disabled=false; $('recspin').classList.remove('on');
+  genBusy=false; $('recspin').classList.remove('on'); updateGenUI();
+}
+$('genbtn').addEventListener('click', generate);
+
+/* ---------- filters & editorial picks view ---------- */
+const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
+const GNAME={crime:"Crime / noir",spy:"Espionage",lit:"Literary",hist:"Historical",west:"Westerns",foot:"Football",series:"Series"};
+let filt = {cat:'all', genres:new Set()};
+function gname(g){ return GNAME[g] || (g.charAt(0).toUpperCase()+g.slice(1)); }
+function gr(p){ return "https://www.goodreads.com/search?q="+encodeURIComponent(p.title+" "+p.author); }
+function filteredPicks(){
+  return state.picks.filter(p=>
+    (filt.cat==='all'||p.category===filt.cat) &&
+    (!filt.genres.size || (p.genres||[]).some(g=>filt.genres.has(g)))
+  );
+}
+function renderFilters(){
+  if(!state.picks.length){
+    $('tasteprof').style.display='none';
+    $('cattoolbar').style.display='none';
+    return;
+  }
+  $('tasteprof').style.display='grid';
+  $('proftext').textContent = state.profile||'';
+  const genres = [...new Set(state.picks.flatMap(p=>p.genres||[]))];
+  $('genrepills').innerHTML = genres.map(g=>
+    `<button class="pill ${filt.genres.has(g)?'on':''}" data-g="${esc(g)}">${gname(g)}</button>`).join('');
+  const cats = [...new Set(state.picks.map(p=>p.category).filter(c=>CATNAME[c]))];
+  $('cattoolbar').style.display='flex';
+  $('cattoolbar').innerHTML =
+    `<button class="fbtn ${filt.cat==='all'?'on':''}" data-cat="all">All</button>`+
+    cats.map(c=>`<button class="fbtn ${filt.cat===c?'on':''}" data-cat="${c}">${CATNAME[c]}</button>`).join('')+
+    `<span class="count">${filteredPicks().length} of ${state.picks.length} picks</span>`;
+}
+$('cattoolbar').addEventListener('click',e=>{
+  const b=e.target.closest('.fbtn'); if(!b) return;
+  filt.cat=b.dataset.cat; renderPicks();
+});
+$('genrepills').addEventListener('click',e=>{
+  const b=e.target.closest('.pill'); if(!b) return;
+  const g=b.dataset.g;
+  filt.genres.has(g)?filt.genres.delete(g):filt.genres.add(g);
+  renderPicks();
 });
 
-const CATNAME={new:"New & upcoming",backlist:"Backlist gem",wildcard:"Wildcard",award:"Award winner"};
 function renderPicks(){
-  $('profilewrap').innerHTML = state.profile ?
-    `<div class="profilebox"><span class="lbl">Your taste profile</span>${esc(state.profile)}</div>` : '';
-  $('pickcards').innerHTML = state.picks.map(p=>`
+  renderFilters();
+  const shown = filteredPicks();
+  $('pickcards').innerHTML = shown.map(p=>`
     <div class="card" data-id="${p.id}">
       <span class="cat ${esc(p.category||'backlist')}">${CATNAME[p.category]||'Pick'}</span>
       <h3>${esc(p.title)}</h3>
-      <div class="author">${esc(p.author)} · ${esc(p.year||'')}</div>
+      <div class="author">${esc(p.author)}</div>
       <p class="desc">${esc(p.desc)}</p>
       <div class="why"><span class="lbl">Why it's for you</span>${esc(p.why)}</div>
+      <div class="meta">
+        <span>${esc(p.year||'')}</span>
+        <a href="${gr(p)}" target="_blank" rel="noopener">Goodreads ↗</a>
+        ${(p.genres&&p.genres.length)?`<span>${p.genres.map(gname).map(esc).join(' · ')}</span>`:''}
+      </div>
       <div class="actions">
         <button class="act morelike">✚ More like this</button>
         <button class="act markread">✓ Already read</button>
@@ -361,12 +669,13 @@ function renderPicks(){
     </div>`).join('');
   renderPurchased();
   bindCardActions();
+  updateGenUI();
 }
 function renderPurchased(){
   $('purchwrap').innerHTML = state.purchased.length ?
     `<div class="purchhead">Purchased from your picks</div>`+
     state.purchased.map(p=>`<div class="purchitem"><em>${esc(p.title)}</em>
-      <span class="a" style="font-family:var(--sans);font-size:.8rem;color:var(--muted)">${esc(p.author)}</span>
+      <span style="font-family:var(--sans);font-size:.8rem;color:var(--muted)">${esc(p.author)}</span>
       <span class="badge">On your shelf soon</span></div>`).join('') : '';
 }
 function bindCardActions(){
@@ -409,7 +718,7 @@ function bindCardActions(){
 }
 
 /* ---------- init ---------- */
-renderLibrary(); renderPicks();
+renderLibrary(); renderPicks(); startCamera(); pull();
 </script>
 </body>
 </html>
