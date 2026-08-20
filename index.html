@@ -468,14 +468,25 @@ function frameToBase64(){
   return cv.toDataURL('image/jpeg',0.92).split(',')[1];
 }
 
+// A spine the model honestly couldn't read comes back as "[ulæselig titel]" or similar.
+// Blank it so the row shows an empty, editable Title field instead of adding that
+// placeholder to someone's library — the author is usually still readable and enough to go on.
+const UNREADABLE=/^[\s\[\(]*(ul(æ|ae)selig|ulaeselig|unreadable|ukendt|unknown|illegible|n\/a|\?+)/i;
+
 async function scanImage(b64){
   $('vfscan').classList.add('on'); $('shutter').disabled=true;
   try{
     const text = await callApi('/api/scan', {image:b64});
     const data = extractJson(text);
-    const found = (data.books||[]).filter(b=>b.title);
+    const found = (data.books||[]).map(b=>{
+      if(UNREADABLE.test(b.title||'')){ b.title=''; b.confidence='low'; }
+      if(UNREADABLE.test(b.author||'')) b.author='';
+      return b;
+    }).filter(b=>(b.title||'').trim() || (b.author||'').trim());
     found.forEach(b=>{
-      if(!pendingScan.some(x=>x.title.toLowerCase()===b.title.toLowerCase())) pendingScan.push(b);
+      const t=(b.title||'').trim().toLowerCase();
+      // Only dedupe on a real title — two unread spines are two different books.
+      if(!t || !pendingScan.some(x=>(x.title||'').trim().toLowerCase()===t)) pendingScan.push(b);
     });
     renderScan();
     if(found.length){ toast(found.length+' spines read — scan the next shelf or confirm below'); $('scanpanel').scrollIntoView({behavior:'smooth', block:'nearest'}); }
