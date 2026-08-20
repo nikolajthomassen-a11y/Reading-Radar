@@ -39,8 +39,12 @@
   .hero-bg .standfirst{font-family:var(--sans);font-size:.84rem;color:rgba(255,255,255,.75);margin-top:8px}
 
   /* ── Viewfinder ── */
-  .vfwrap{position:relative;margin-top:18px;border-radius:20px;overflow:hidden;background:#08251c;aspect-ratio:4/3;box-shadow:0 18px 40px -18px rgba(0,0,0,.5)}
+  .vfwrap{position:relative;margin-top:18px;border-radius:20px;overflow:hidden;background:#08251c;aspect-ratio:3/4;max-height:41vh;margin-left:auto;margin-right:auto;box-shadow:0 18px 40px -18px rgba(0,0,0,.5)}
   #vf{width:100%;height:100%;object-fit:cover;display:block}
+  @media (min-height:780px){ .vfwrap{max-height:52vh} }
+  @media (min-height:900px){ .vfwrap{max-height:56vh} }
+  /* Short phones: drop the intro line so the portrait frame stays usably wide. */
+  @media (max-height:720px){ .hero-inner .standfirst{display:none} .vfwrap{max-height:50vh;margin-top:12px} }
   .guide{position:absolute;inset:14px;border-radius:14px;pointer-events:none}
   .guide i{position:absolute;width:26px;height:26px;border:2.5px solid rgba(255,255,255,.85)}
   .guide i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0}
@@ -96,10 +100,17 @@
   .libitem:last-child{border-bottom:none}
   .libitem .a{color:var(--muted);font-size:.82rem;font-family:var(--sans)}
   .libitem .rm{margin-left:auto;font-family:var(--sans);font-size:.9rem;color:var(--muted);background:none;border:none;padding:4px 8px;cursor:pointer}
-  .scanrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+  .scanrow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
   .scanrow:last-child{border-bottom:none}
-  .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent)}
-  .scanrow .lowc{font-family:var(--sans);font-size:.68rem;color:var(--back);background:var(--back-bg);border-radius:999px;padding:2px 8px}
+  .scanrow input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent);flex:none;margin-top:9px}
+  .scanrow .lowc{font-family:var(--sans);font-size:.68rem;color:var(--back);background:var(--back-bg);border-radius:999px;padding:2px 8px;flex:none;align-self:flex-start;margin-top:8px}
+  .scanrow.unsure{background:rgba(176,133,20,.07)}
+  .scanfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .scanedit{width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:8px;padding:5px 7px;background:transparent;color:inherit;-webkit-appearance:none}
+  .scanedit.t{font-family:var(--serif);font-style:italic;font-size:.95rem}
+  .scanedit.a{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+  .scanedit:focus{outline:none;border-color:var(--accent);background:#fff}
+  .scanhint{font-family:var(--sans);font-size:.75rem;color:var(--muted);padding:0 0 8px}
   .manrow{display:flex;gap:8px;margin-top:10px}
   .manrow input{flex:1;font-family:var(--sans);font-size:16px;border:1px solid var(--line-dark);border-radius:10px;padding:10px 12px;background:var(--card);min-width:0}
   .manrow button{font-family:var(--sans);font-weight:600;font-size:.85rem;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer}
@@ -199,7 +210,7 @@
     <div class="hero-inner">
       <div class="kicker">Reading Radar</div>
       <h1>Scan your shelves,<br>meet your <em>next book</em></h1>
-      <p class="standfirst">Fit one shelf in the frame and tap the shutter. The spines become your library.</p>
+      <p class="standfirst">Hold the phone upright, fit one shelf in the frame and tap the shutter. The spines become your library.</p>
 
       <div class="vfwrap">
         <video id="vf" autoplay playsinline muted></video>
@@ -230,7 +241,8 @@
     </div>
 
     <div class="panel" id="scanpanel" style="display:none">
-      <h2>Found on this shelf — untick anything wrong</h2>
+      <h2>Found on this shelf</h2>
+      <div class="scanhint">Tap a title or author to correct it. Untick anything that isn't yours.</div>
       <div id="scanlist"></div>
       <div class="btnrow">
         <button class="btn primary" id="addscanned">Add to my library</button>
@@ -416,7 +428,7 @@ async function startCamera(){
   if(stream || isDesktop()) return;
   try{
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1440} },
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:2880}, height:{ideal:3840}, aspectRatio:{ideal:3/4} },
       audio:false
     });
     $('vf').srcObject = stream;
@@ -438,23 +450,43 @@ document.addEventListener('visibilitychange',()=>{
 
 function frameToBase64(){
   const v = $('vf');
-  const MAX=1600;
-  let w=v.videoWidth, h=v.videoHeight;
-  if(!w||!h) return null;
+  const vw=v.videoWidth, vh=v.videoHeight;
+  if(!vw||!vh) return null;
+  // The preview is object-fit:cover, so it shows a centre crop of the camera frame.
+  // Send that same crop — otherwise people scan shelves they never saw in the frame,
+  // and the wasted margins eat the pixel budget that spine text needs.
+  const box = v.getBoundingClientRect();
+  const boxAR = (box.width>0 && box.height>0) ? box.width/box.height : 3/4;
+  let sx=0, sy=0, sw=vw, sh=vh;
+  if(vw/vh > boxAR){ sw=Math.round(vh*boxAR); sx=Math.round((vw-sw)/2); }
+  else            { sh=Math.round(vw/boxAR); sy=Math.round((vh-sh)/2); }
+  const MAX=2000;
+  let w=sw, h=sh;
   if(Math.max(w,h)>MAX){ const k=MAX/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-  cv.getContext('2d').drawImage(v,0,0,w,h);
-  return cv.toDataURL('image/jpeg',0.85).split(',')[1];
+  cv.getContext('2d').drawImage(v, sx,sy,sw,sh, 0,0,w,h);
+  return cv.toDataURL('image/jpeg',0.92).split(',')[1];
 }
+
+// A spine the model honestly couldn't read comes back as "[ulæselig titel]" or similar.
+// Blank it so the row shows an empty, editable Title field instead of adding that
+// placeholder to someone's library — the author is usually still readable and enough to go on.
+const UNREADABLE=/^[\s\[\(]*(ul(æ|ae)selig|ulaeselig|unreadable|ukendt|unknown|illegible|n\/a|\?+)/i;
 
 async function scanImage(b64){
   $('vfscan').classList.add('on'); $('shutter').disabled=true;
   try{
     const text = await callApi('/api/scan', {image:b64});
     const data = extractJson(text);
-    const found = (data.books||[]).filter(b=>b.title);
+    const found = (data.books||[]).map(b=>{
+      if(UNREADABLE.test(b.title||'')){ b.title=''; b.confidence='low'; }
+      if(UNREADABLE.test(b.author||'')) b.author='';
+      return b;
+    }).filter(b=>(b.title||'').trim() || (b.author||'').trim());
     found.forEach(b=>{
-      if(!pendingScan.some(x=>x.title.toLowerCase()===b.title.toLowerCase())) pendingScan.push(b);
+      const t=(b.title||'').trim().toLowerCase();
+      // Only dedupe on a real title — two unread spines are two different books.
+      if(!t || !pendingScan.some(x=>(x.title||'').trim().toLowerCase()===t)) pendingScan.push(b);
     });
     renderScan();
     if(found.length){ toast(found.length+' spines read — scan the next shelf or confirm below'); $('scanpanel').scrollIntoView({behavior:'smooth', block:'nearest'}); }
@@ -475,12 +507,12 @@ function resizeFile(file){
   return new Promise((resolve,reject)=>{
     const img = new Image();
     img.onload = ()=>{
-      const MAX=1600;
+      const MAX=2000;
       let w=img.width, h=img.height;
       if(Math.max(w,h)>MAX){ const k=MAX/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
       const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
       cv.getContext('2d').drawImage(img,0,0,w,h);
-      resolve(cv.toDataURL('image/jpeg',0.85).split(',')[1]);
+      resolve(cv.toDataURL('image/jpeg',0.92).split(',')[1]);
     };
     img.onerror=reject;
     img.src=URL.createObjectURL(file);
@@ -497,18 +529,35 @@ function renderScan(){
   if(!pendingScan.length){ $('scanpanel').style.display='none'; return; }
   $('scanpanel').style.display='block';
   $('scanlist').innerHTML = pendingScan.map((b,i)=>`
-    <label class="scanrow">
+    <div class="scanrow${b.confidence==='low'?' unsure':''}">
       <input type="checkbox" data-i="${i}" ${b.confidence==='low'?'':'checked'}>
-      <span><em>${esc(b.title)}</em> <span class="a">${esc(b.author||'')}</span></span>
-      ${b.confidence==='low'?'<span class="lowc">unsure</span>':''}
-    </label>`).join('');
+      <div class="scanfields">
+        <input class="scanedit t" data-i="${i}" value="${esc(b.title)}" placeholder="Title" spellcheck="false" autocapitalize="words">
+        <input class="scanedit a" data-i="${i}" value="${esc(b.author||'')}" placeholder="Author" spellcheck="false" autocapitalize="words">
+      </div>
+      ${b.confidence==='low'?'<span class="lowc">check</span>':''}
+    </div>`).join('');
+  // Editing a row keeps it in the list: a corrected book is never silently dropped.
+  document.querySelectorAll('#scanlist .scanedit').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      const i=+e.target.dataset.i;
+      if(!pendingScan[i]) return;
+      if(e.target.classList.contains('t')) pendingScan[i].title=e.target.value;
+      else pendingScan[i].author=e.target.value;
+      const cb=document.querySelector('#scanlist input[type=checkbox][data-i="'+i+'"]');
+      if(cb && !cb.checked && e.target.value.trim()) cb.checked=true;
+    });
+  });
 }
 $('addscanned').addEventListener('click',()=>{
   let n=0;
-  document.querySelectorAll('#scanlist input:checked').forEach(cb=>{
+  document.querySelectorAll('#scanlist input[type=checkbox]:checked').forEach(cb=>{
     const b=pendingScan[+cb.dataset.i];
-    if(!state.library.some(x=>x.t.toLowerCase()===b.title.toLowerCase())){
-      state.library.push({t:b.title, a:b.author||''}); n++;
+    if(!b) return;
+    const t=(b.title||'').trim(), a=(b.author||'').trim();
+    if(!t) return;
+    if(!state.library.some(x=>x.t.toLowerCase()===t.toLowerCase())){
+      state.library.push({t, a}); n++;
     }
   });
   pendingScan=[]; renderScan(); save(); renderLibrary();
