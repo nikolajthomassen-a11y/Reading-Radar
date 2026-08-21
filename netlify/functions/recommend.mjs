@@ -1,16 +1,20 @@
 // POST /api/recommend — builds a taste profile and personalized picks from the user's library (streamed).
-function monthlyPrompt(library, exclude) {
-  return `You are a brilliant, well-read bookseller. A reader's personal library is listed below (books they own and have mostly read). Infer their taste and recommend books they do NOT own.
+function monthlyPrompt(library, exclude, dismissed = []) {
+  const line = b => `- ${b.t}${b.a ? ' — ' + b.a : ''}${b.r === 'up' ? '   [LOVED IT]' : b.r === 'down' ? '   [NOT FOR THEM]' : ''}`;
+  return `You are a brilliant, well-read bookseller. A reader's personal library is listed below (books they own and have mostly read). Some carry the reader's own verdict: [LOVED IT] or [NOT FOR THEM]. Infer their taste and recommend books they do NOT own.
 
 THEIR LIBRARY:
-${library.map(b => `- ${b.t}${b.a ? ' — ' + b.a : ''}`).join('\n')}
+${library.map(line).join('\n')}
 ${exclude.length ? `\nDO NOT RECOMMEND (already suggested or owned):\n${exclude.map(t => '- ' + t).join('\n')}` : ''}
+${dismissed.length ? `\nRECOMMENDATIONS THE READER EXPLICITLY REJECTED (avoid these AND anything too similar to them):\n${dismissed.map(t => '- ' + t).join('\n')}` : ''}
 
 Return ONLY a JSON object, no other text, in exactly this shape:
 {"profile":"2-3 sentences describing this reader's taste, written to the reader as 'you'","picks":[{"title":"...","author":"...","year":"2020","category":"new","desc":"one vivid sentence about the book","why":"one sentence connecting it to specific books in THEIR library","genres":["crime"]}]}
 
 Rules:
 - Exactly 8 picks: 2 with category "new" (published in the last ~2 years), 3 "backlist", 2 "award" (major prize winners: Booker, Pulitzer, Edgar, National Book Award etc. — name the prize in "year"), 1 "wildcard" (a stretch pick just outside their comfort zone).
+- Weight [LOVED IT] books far more heavily than the rest of the library — they are the strongest taste signal you have.
+- Treat [NOT FOR THEM] books and the rejected list as anti-signals: steer clearly away from their style, mood and subgenre.
 - Only recommend real books you are confident exist, with correct authors.
 - Never recommend a book that is in their library or on the do-not-recommend list.
 - "why" must reference specific titles or authors they own.
@@ -34,12 +38,12 @@ export default async (req) => {
   const code = process.env.APP_PASSCODE;
   if (code && req.headers.get('x-app-code') !== code) return new Response('Unauthorized', { status: 401 });
 
-  const { mode = 'monthly', library = [], exclude = [], seed } = await req.json();
+  const { mode = 'monthly', library = [], exclude = [], dismissed = [], seed } = await req.json();
   if (!library.length) return new Response('Empty library', { status: 400 });
 
   const prompt = mode === 'similar' && seed
     ? similarPrompt(seed, library, exclude)
-    : monthlyPrompt(library, exclude);
+    : monthlyPrompt(library, exclude, dismissed);
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
