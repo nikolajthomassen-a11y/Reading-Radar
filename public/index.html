@@ -118,6 +118,15 @@
   .scanedit.a{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
   .scanedit:focus{outline:none;border-color:var(--accent);background:#fff}
   .scanhint{font-family:var(--sans);font-size:.75rem;color:var(--muted);padding:0 0 8px}
+  .ratechips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .ratechips .q{font-family:var(--sans);font-size:.8rem;color:var(--muted);margin-right:2px}
+  .rchip{font-family:var(--sans);font-size:.78rem;border:1px solid var(--line-dark);background:#fff;border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--body)}
+  .rchip.on-up{background:var(--new-bg);border-color:var(--new);color:var(--new);font-weight:700}
+  .rchip.on-mid{background:#efece6;border-color:var(--line-dark);color:var(--ink);font-weight:700}
+  .rchip.on-down{background:var(--back-bg);border-color:var(--back);color:var(--back);font-weight:700}
+  .ratebadge{font-family:var(--sans);font-size:.66rem;border-radius:999px;padding:2px 7px;flex:none;white-space:nowrap}
+  .ratebadge.up{color:var(--new);background:var(--new-bg)}
+  .ratebadge.down{color:var(--back);background:var(--back-bg)}
   .manrow{display:flex;gap:8px;margin-top:10px}
   .manrow input{flex:1;font-family:var(--sans);font-size:16px;border:1px solid var(--line-dark);border-radius:10px;padding:10px 12px;background:var(--card);min-width:0}
   .manrow button{font-family:var(--sans);font-weight:600;font-size:.85rem;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer}
@@ -316,7 +325,7 @@
 
 <script>
 /* ---------- state & sync ---------- */
-let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], profile:''};
+let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], dismissed:[], profile:''};
 function saveLocal(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
 function loadLocal(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
 loadLocal();
@@ -582,9 +591,16 @@ function renderLibrary(){
     <div class="libitem editing">
       <input class="libedit t" data-i="${i}" value="${esc(b.t)}" placeholder="Title" spellcheck="false" autocapitalize="words">
       <input class="libedit a" data-i="${i}" value="${esc(b.a)}" placeholder="Author" spellcheck="false" autocapitalize="words">
+      <div class="ratechips">
+        <span class="q">Your verdict:</span>
+        <button class="rchip lib ${b.r==='up'?'on-up':''}" data-i="${i}" data-r="up">♥ Loved it</button>
+        <button class="rchip lib ${b.r==='mid'?'on-mid':''}" data-i="${i}" data-r="mid">Fine</button>
+        <button class="rchip lib ${b.r==='down'?'on-down':''}" data-i="${i}" data-r="down">Not for me</button>
+      </div>
       <button class="libdone" data-i="${i}">Done</button>
     </div>` : `
     <div class="libitem"><span class="txt" data-i="${i}" title="Tap to edit"><em>${esc(b.t)}</em><span class="a">${esc(b.a)}</span></span>
+    ${b.r==='up'?'<span class="ratebadge up">♥ Loved</span>':b.r==='down'?'<span class="ratebadge down">Not for me</span>':''}
     <button class="rm" data-i="${i}">✕</button></div>`).join('');
   document.querySelectorAll('#liblist .rm').forEach(btn=>btn.addEventListener('click',()=>{
     state.library.splice(+btn.dataset.i,1);
@@ -599,6 +615,11 @@ function renderLibrary(){
   document.querySelectorAll('#liblist .libedit').forEach(inp=>inp.addEventListener('input',e=>{
     const b=state.library[+e.target.dataset.i]; if(!b) return;
     if(e.target.classList.contains('t')) b.t=e.target.value; else b.a=e.target.value;
+  }));
+  document.querySelectorAll('#liblist .rchip.lib').forEach(btn=>btn.addEventListener('click',()=>{
+    const b=state.library[+btn.dataset.i]; if(!b) return;
+    b.r = (b.r===btn.dataset.r) ? undefined : btn.dataset.r;   // tap again to clear
+    save(); renderLibrary();
   }));
   const doneBtn=document.querySelector('#liblist .libdone');
   if(doneBtn) doneBtn.addEventListener('click',()=>{
@@ -633,7 +654,8 @@ async function generate(){
     const text = await callApi('/api/recommend', {
       mode:'monthly',
       library: state.library,
-      exclude: state.history
+      exclude: state.history,
+      dismissed: state.dismissed||[]
     });
     const data = extractJson(text);
     state.profile = data.profile||state.profile;
@@ -706,6 +728,7 @@ function renderPicks(){
         <button class="act morelike">✚ More like this</button>
         <button class="act markread">✓ Already read</button>
         <button class="act markbought">🛒 Bought it</button>
+        <button class="act dismiss">✗ Not for me</button>
       </div>
       <div class="similar" style="display:none"></div>
     </div>`).join('');
@@ -713,12 +736,30 @@ function renderPicks(){
   bindCardActions();
   updateGenUI();
 }
+let finishing = -1; // purchased row currently being rated
 function renderPurchased(){
   $('purchwrap').innerHTML = state.purchased.length ?
     `<div class="purchhead">Purchased from your picks</div>`+
-    state.purchased.map(p=>`<div class="purchitem"><em>${esc(p.title)}</em>
+    state.purchased.map((p,i)=>`<div class="purchitem"><em>${esc(p.title)}</em>
       <span style="font-family:var(--sans);font-size:.8rem;color:var(--muted)">${esc(p.author)}</span>
-      <span class="badge">On your shelf soon</span></div>`).join('') : '';
+      ${i===finishing ? `<span class="ratechips"><span class="q">How was it?</span>
+        <button class="rchip fin" data-i="${i}" data-r="up">♥ Loved it</button>
+        <button class="rchip fin" data-i="${i}" data-r="mid">Fine</button>
+        <button class="rchip fin" data-i="${i}" data-r="down">Not for me</button></span>`
+      : `<span class="badge">On your shelf soon</span>
+        <button class="act finish" data-i="${i}">✓ Finished it?</button>`}
+      </div>`).join('') : '';
+  document.querySelectorAll('#purchwrap .finish').forEach(btn=>btn.addEventListener('click',()=>{
+    finishing=+btn.dataset.i; renderPurchased();
+  }));
+  document.querySelectorAll('#purchwrap .rchip.fin').forEach(ch=>ch.addEventListener('click',()=>{
+    const p=state.purchased[+ch.dataset.i]; if(!p) return;
+    state.library.push({t:p.title, a:p.author, r:ch.dataset.r});
+    state.purchased.splice(+ch.dataset.i,1);
+    finishing=-1;
+    save(); renderPicks(); renderLibrary();
+    toast('Added to your library — the next picks just got smarter');
+  }));
 }
 function bindCardActions(){
   document.querySelectorAll('#pickcards .card').forEach(card=>{
@@ -726,10 +767,26 @@ function bindCardActions(){
     const pick = ()=> state.picks.find(p=>p.id===id);
     card.querySelector('.markread').addEventListener('click',()=>{
       const p=pick(); if(!p) return;
-      state.library.push({t:p.title, a:p.author});
+      // The golden moment: they've read it — one tap tells the recommender how it landed.
+      const acts=card.querySelector('.actions');
+      acts.innerHTML=`<div class="ratechips"><span class="q">How was it?</span>
+        <button class="rchip pk" data-r="up">♥ Loved it</button>
+        <button class="rchip pk" data-r="mid">Fine</button>
+        <button class="rchip pk" data-r="down">Not for me</button></div>`;
+      acts.querySelectorAll('.rchip.pk').forEach(ch=>ch.addEventListener('click',()=>{
+        state.library.push({t:p.title, a:p.author, r:ch.dataset.r});
+        state.picks = state.picks.filter(x=>x.id!==id);
+        save(); renderPicks(); renderLibrary();
+        toast('Moved to your library');
+      }));
+    });
+    card.querySelector('.dismiss').addEventListener('click',()=>{
+      const p=pick(); if(!p) return;
+      if(!state.dismissed) state.dismissed=[];
+      state.dismissed.push(p.title);
       state.picks = state.picks.filter(x=>x.id!==id);
-      save(); renderPicks(); renderLibrary();
-      toast('Moved to your library');
+      save(); renderPicks();
+      toast("Noted — I'll steer away from that");
     });
     card.querySelector('.markbought').addEventListener('click',()=>{
       const p=pick(); if(!p) return;
@@ -746,7 +803,7 @@ function bindCardActions(){
       try{
         const text = await callApi('/api/recommend', {
           mode:'similar', seed:{title:p.title, author:p.author},
-          library: state.library, exclude: state.history
+          library: state.library, exclude: state.history.concat(state.dismissed||[])
         });
         const data = extractJson(text);
         const sims = data.picks||[];
