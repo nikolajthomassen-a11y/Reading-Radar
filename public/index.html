@@ -325,7 +325,13 @@
 
 <script>
 /* ---------- state & sync ---------- */
-let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], dismissed:[], profile:''};
+let state = {code:'', syncId:'', rev:0, library:[], picks:[], purchased:[], history:[], dismissed:[], profile:'', genKey:''};
+// Fingerprint of the library at the moment picks were generated — lets us notice "shelf changed since".
+function libKey(){
+  const str = state.library.map(b=>(b.t||'').toLowerCase().trim()).sort().join('|');
+  let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))|0;
+  return String(h);
+}
 function saveLocal(){ try{ localStorage.setItem('rr-state', JSON.stringify(state)); }catch(e){} }
 function loadLocal(){ try{ const s=localStorage.getItem('rr-state'); if(s) state=Object.assign(state, JSON.parse(s)); }catch(e){} }
 loadLocal();
@@ -383,8 +389,15 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
   if(b.dataset.tab==='shelf'){ startCamera(); }
   else{
     stopCamera();
-    /* the magic starts the moment you arrive: no picks yet → generate right away */
-    if(!state.picks.length && !genBusy) generate(); else updateGenUI();
+    /* the magic starts the moment you arrive: no picks yet → generate right away.
+       And if the shelf has changed since the current picks were made, refresh so
+       newly scanned books count immediately — not only after a manual refresh. */
+    if(!state.picks.length && !genBusy) generate();
+    else if(!genBusy && state.library.length>=3 && state.genKey && libKey()!==state.genKey){
+      toast('Your shelf has changed — updating your picks');
+      generate();
+    }
+    else updateGenUI();
   }
 }));
 
@@ -646,6 +659,52 @@ function updateGenUI(){
   $('genrow').style.display = hasPicks ? 'flex' : 'none';
   $('emptyhint').style.display = (!hasPicks && !canGen) ? 'block' : 'none';
 }
+/* ---------- reality check: only recommend books that actually exist ----------
+   Every pick is checked against Google Books before it is shown. The model is
+   asked for a few spares, so dropped hallucinations don't shrink the list.
+   Fails OPEN: if the lookup service is unreachable, picks pass through. */
+function normTxt(x){ return (x||'').toLowerCase().replace(/[^a-z0-9æøåäöüéèáà ]/gi,' ').replace(/\s+/g,' ').trim(); }
+function tokenOverlap(a,b){
+  const A=new Set(a.split(' ')), B=new Set(b.split(' '));
+  if(!A.size||!B.size) return 0;
+  let hit=0; A.forEach(w=>{ if(B.has(w)) hit++; });
+  return hit/Math.min(A.size,B.size);
+}
+async function verifyBook(title, author){
+  const gb = async q=>{
+    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q='+encodeURIComponent(q)+'&maxResults=5&fields=items(volumeInfo(title,authors))');
+    if(!r.ok) return null;
+    return (await r.json()).items||[];
+  };
+  try{
+    const last=(author||'').trim().split(/\s+/).pop()||'';
+    let items = await gb(`intitle:"${title}"`+(last?` inauthor:"${last}"`:''));
+    if(items===null) return true;                       // API unavailable → don't block
+    if(!items.length) items = (await gb(`"${title}" ${last}`)) || [];
+    const nt=normTxt(title);
+    return items.some(it=>{
+      const vi=it.volumeInfo||{};
+      const vt=normTxt(vi.title);
+      const tOk = vt && (vt.includes(nt) || nt.includes(vt) || tokenOverlap(nt,vt)>=0.6);
+      const aOk = !last || (vi.authors||[]).some(a=>normTxt(a).includes(normTxt(last)));
+      return tOk && aOk;
+    });
+  }catch(e){ return true; }                             // network error → fail open
+}
+async function verifyAll(list){
+  const flags = await Promise.all(list.map(p=>verifyBook(p.title,p.author)));
+  return list.filter((p,i)=>flags[i]);
+}
+function selectPicks(verified){
+  const quota={new:2,backlist:3,award:2,wildcard:1};
+  const chosen=[], rest=[];
+  for(const p of verified){
+    if(quota[p.category]>0){ quota[p.category]--; chosen.push(p); } else rest.push(p);
+  }
+  while(chosen.length<8 && rest.length) chosen.push(rest.shift());
+  return chosen;
+}
+
 async function generate(){
   if(genBusy) return;
   if(state.library.length<3){ updateGenUI(); toast('Scan a shelf first — I need at least a few books'); return; }
@@ -659,9 +718,12 @@ async function generate(){
     });
     const data = extractJson(text);
     state.profile = data.profile||state.profile;
-    const fresh = (data.picks||[]).map((p,i)=>({ id: Date.now()+'-'+i, ...p }));
+    const real = await verifyAll(data.picks||[]);       // drop books that don't exist
+    const fresh = selectPicks(real).map((p,i)=>({ id: Date.now()+'-'+i, ...p }));
+    if(!fresh.length) throw new Error('No verifiable picks — try again');
     state.picks = fresh;
     state.history = state.history.concat(fresh.map(p=>p.title));
+    state.genKey = libKey();
     save(); renderPicks();
   }catch(err){ toast(err.message); }
   genBusy=false; $('recspin').classList.remove('on'); updateGenUI();
@@ -806,7 +868,7 @@ function bindCardActions(){
           library: state.library, exclude: state.history.concat(state.dismissed||[])
         });
         const data = extractJson(text);
-        const sims = data.picks||[];
+        const sims = await verifyAll(data.picks||[]);   // reality-check these too
         state.history = state.history.concat(sims.map(s=>s.title)); save();
         box.innerHTML = sims.map(s=>`<div class="simcard">
           <div class="t">${esc(s.title)}</div><div class="a">${esc(s.author)} · ${esc(s.year||'')}</div>
@@ -817,6 +879,7 @@ function bindCardActions(){
 }
 
 /* ---------- init ---------- */
+if(!state.genKey && state.picks.length) state.genKey = libKey();  // pre-update data: current picks match current shelf
 renderLibrary(); renderPicks(); startCamera(); pull();
 </script>
 </body>
