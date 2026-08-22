@@ -12,24 +12,24 @@ Return ONLY a JSON object, no other text, in exactly this shape:
 {"profile":"2-3 sentences describing this reader's taste, written to the reader as 'you'","picks":[{"title":"...","author":"...","year":"2020","category":"new","desc":"one vivid sentence about the book","why":"one sentence connecting it to specific books in THEIR library","genres":["crime"]}]}
 
 Rules:
-- Exactly 8 picks: 2 with category "new" (published in the last ~2 years), 3 "backlist", 2 "award" (major prize winners: Booker, Pulitzer, Edgar, National Book Award etc. — name the prize in "year"), 1 "wildcard" (a stretch pick just outside their comfort zone).
+- Exactly 11 picks: 3 with category "new" (published in the last ~2 years), 4 "backlist", 3 "award" (major prize winners: Booker, Pulitzer, Edgar, National Book Award etc. — name the prize in "year"), 1 "wildcard" (a stretch pick just outside their comfort zone). (Extras beyond the best 8 act as spares.)
 - Weight [LOVED IT] books far more heavily than the rest of the library — they are the strongest taste signal you have.
 - Treat [NOT FOR THEM] books and the rejected list as anti-signals: steer clearly away from their style, mood and subgenre.
-- Only recommend real books you are confident exist, with correct authors.
+- Only recommend books you are CERTAIN exist, with exactly this title by exactly this author. If you have any doubt, choose a better-known book instead — a famous safe pick always beats an impressive-sounding invention. Never guess at translated titles.
 - Never recommend a book that is in their library or on the do-not-recommend list.
 - "why" must reference specific titles or authors they own.
 - Keep every field concise. category must be one of: new, backlist, award, wildcard.`;
 }
 
 function similarPrompt(seed, library, exclude) {
-  return `You are a brilliant bookseller. A reader liked the sound of "${seed.title}" by ${seed.author}. Recommend 3 more real books that are strikingly similar in feel, plot-drive and quality.
+  return `You are a brilliant bookseller. A reader liked the sound of "${seed.title}" by ${seed.author}. Recommend 4 real books that are strikingly similar in feel, plot-drive and quality.
 
 They already own these (do not recommend): ${library.map(b => b.t).join('; ')}
 Also do not recommend: ${exclude.join('; ')}
 
 Return ONLY a JSON object, no other text:
 {"picks":[{"title":"...","author":"...","year":"2019","desc":"one sentence on the book and why it matches ${seed.title}"}]}
-Only real books with correct authors.`;
+Recommend 4 so there is a spare. Only books you are CERTAIN exist, with correct authors — a well-known match beats an invented perfect one.`;
 }
 
 export default async (req) => {
