@@ -188,6 +188,22 @@
   .spin .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin:0 3px;animation:b 1.2s infinite}
   .spin .dot:nth-child(2){animation-delay:.2s}.spin .dot:nth-child(3){animation-delay:.4s}
 
+  /* ── animated book loader (pure CSS — no assets) ── */
+  .bookload{position:relative;width:128px;height:82px;margin:6px auto 16px;perspective:420px}
+  .bhalf{position:absolute;bottom:4px;width:56px;height:68px;background:#fff;border:2.5px solid var(--accent);box-sizing:border-box}
+  .bhalf.l{left:8px;border-right-width:1.5px;border-radius:10px 2px 2px 10px;transform:rotateY(14deg);transform-origin:right center;
+    background-image:linear-gradient(0deg,transparent 24%,var(--line) 24%,var(--line) 27%,transparent 27%,transparent 46%,var(--line) 46%,var(--line) 49%,transparent 49%,transparent 68%,var(--line) 68%,var(--line) 71%,transparent 71%);background-size:70% 100%;background-position:55% 55%;background-repeat:no-repeat}
+  .bhalf.r{right:8px;border-left-width:1.5px;border-radius:2px 10px 10px 2px;transform:rotateY(-14deg);transform-origin:left center;
+    background-image:linear-gradient(0deg,transparent 24%,var(--line) 24%,var(--line) 27%,transparent 27%,transparent 46%,var(--line) 46%,var(--line) 49%,transparent 49%,transparent 68%,var(--line) 68%,var(--line) 71%,transparent 71%);background-size:70% 100%;background-position:45% 55%;background-repeat:no-repeat}
+  .bpage{position:absolute;left:50%;bottom:4px;width:54px;height:66px;background:linear-gradient(105deg,#fff 60%,var(--new-bg));border:2px solid var(--accent);border-left:none;border-radius:2px 9px 9px 2px;transform-origin:left center;backface-visibility:visible;animation:pageflip 1.5s cubic-bezier(.5,.08,.5,.92) infinite;box-sizing:border-box}
+  .bpage.p2{animation-delay:.18s;opacity:.85}
+  .bpage.p3{animation-delay:.36s;opacity:.7}
+  @keyframes pageflip{0%{transform:rotateY(4deg)}12%{transform:rotateY(4deg)}72%,100%{transform:rotateY(-176deg)}}
+  .bookmark{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:8px;height:10px;background:var(--mint);clip-path:polygon(0 0,100% 0,100% 100%,50% 62%,0 100%)}
+  .loadmsg{font-family:var(--serif);font-style:italic;font-size:1.02rem;color:var(--ink);min-height:1.5em;transition:opacity .25s}
+  .loadmsg.swap{opacity:0}
+  .loadsub{margin-top:6px;font-size:.8rem;color:var(--muted)}
+
   .banner{display:none;background:var(--back-bg);color:var(--back);font-family:var(--sans);font-size:.84rem;border-radius:12px;padding:12px 14px;margin-top:14px}
   .banner.on{display:block}
   .banner input{width:100%;margin-top:8px;font-size:16px;border:1px solid var(--line-dark);border-radius:8px;padding:9px 11px}
@@ -308,7 +324,15 @@
     <div class="btnrow" id="genrow" style="display:none">
       <button class="btn secondary" id="genbtn">↻ Refresh with a new batch</button>
     </div>
-    <div class="spin" id="recspin">Reading your taste, picking your books — about half a minute<br><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="spin" id="recspin" role="status" aria-live="polite">
+      <div class="bookload" aria-hidden="true">
+        <div class="bhalf l"></div><div class="bhalf r"></div>
+        <div class="bpage p3"></div><div class="bpage p2"></div><div class="bpage p1"></div>
+        <div class="bookmark"></div>
+      </div>
+      <div class="loadmsg" id="loadmsg">Reading your shelves…</div>
+      <div class="loadsub">About half a minute — good books are worth the wait</div>
+    </div>
 
     <div class="toolbar" id="cattoolbar" style="display:none"></div>
     <div id="pickcards"></div>
@@ -705,10 +729,34 @@ function selectPicks(verified){
   return chosen;
 }
 
+/* Staged loader messages — narrate the real steps so the wait feels purposeful.
+   Advances every ~5s and parks on the last one; never loops back. */
+const LOADMSGS=[
+  'Reading your shelves…',
+  'Getting to know your taste…',
+  'Browsing the backlist…',
+  'Weighing up the award winners…',
+  'Checking every book actually exists…',
+  'Picking the eight best for you…'
+];
+let msgTimer=null;
+function startLoadMsgs(){
+  let ix=0; const el=$('loadmsg'); if(!el) return;
+  el.textContent=LOADMSGS[0];
+  clearInterval(msgTimer);
+  msgTimer=setInterval(()=>{
+    if(ix>=LOADMSGS.length-1){ clearInterval(msgTimer); return; }
+    ix++;
+    el.classList.add('swap');
+    setTimeout(()=>{ el.textContent=LOADMSGS[ix]; el.classList.remove('swap'); },250);
+  },5000);
+}
+function stopLoadMsgs(){ clearInterval(msgTimer); }
+
 async function generate(){
   if(genBusy) return;
   if(state.library.length<3){ updateGenUI(); toast('Scan a shelf first — I need at least a few books'); return; }
-  genBusy=true; updateGenUI(); $('recspin').classList.add('on');
+  genBusy=true; updateGenUI(); $('recspin').classList.add('on'); startLoadMsgs();
   try{
     const text = await callApi('/api/recommend', {
       mode:'monthly',
@@ -726,7 +774,7 @@ async function generate(){
     state.genKey = libKey();
     save(); renderPicks();
   }catch(err){ toast(err.message); }
-  genBusy=false; $('recspin').classList.remove('on'); updateGenUI();
+  genBusy=false; stopLoadMsgs(); $('recspin').classList.remove('on'); updateGenUI();
 }
 $('genbtn').addEventListener('click', generate);
 
